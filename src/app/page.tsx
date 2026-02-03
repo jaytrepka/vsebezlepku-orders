@@ -13,7 +13,7 @@ interface OrderItem {
     nazev: string;
     slozeni: string;
     nutricniHodnoty: string;
-    skladovani: string;
+    skladovani?: string;
     vyrobce: string;
   } | null;
 }
@@ -183,6 +183,17 @@ export default function Home() {
     }
   }
 
+  function openLabelModal(productName: string) {
+    setLabelModal({ open: true, productName });
+    setLabelForm({
+      nazev: productName,
+      slozeni: "",
+      nutricniHodnoty: "",
+      skladovani: "",
+      vyrobce: "",
+    });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -346,19 +357,7 @@ export default function Home() {
                             </span>
                           ) : (
                             <button
-                              onClick={() => {
-                                setLabelModal({
-                                  open: true,
-                                  productName: item.productName,
-                                });
-                                setLabelForm({
-                                  nazev: item.productName,
-                                  slozeni: "",
-                                  nutricniHodnoty: "",
-                                  skladovani: "",
-                                  vyrobce: "",
-                                });
-                              }}
+                              onClick={() => openLabelModal(item.productName)}
                               className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1"
                             >
                               <Plus className="w-3 h-3" />
@@ -408,13 +407,13 @@ export default function Home() {
                     setLabelForm({ ...labelForm, nazev: e.target.value })
                   }
                   className="w-full border rounded-lg px-3 py-2"
-                  placeholder="Název produktu na štítku"
+                  placeholder="PISTÁCIOVÉ DONUTY (90g)"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Složení
+                  Složení (alergeny tučně pomocí **text**)
                 </label>
                 <textarea
                   value={labelForm.slozeni}
@@ -422,14 +421,14 @@ export default function Home() {
                     setLabelForm({ ...labelForm, slozeni: e.target.value })
                   }
                   className="w-full border rounded-lg px-3 py-2"
-                  rows={2}
-                  placeholder="Seznam ingrediencí"
+                  rows={4}
+                  placeholder="bílá poleva 29 % (cukr, rostlinný tuk), sušené odstředěné **mléko**, emulgátor: **sójový** lecitin..."
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nutriční hodnoty
+                  Nutriční hodnoty (na 100g)
                 </label>
                 <textarea
                   value={labelForm.nutricniHodnoty}
@@ -440,14 +439,14 @@ export default function Home() {
                     })
                   }
                   className="w-full border rounded-lg px-3 py-2"
-                  rows={2}
-                  placeholder="Energie, bílkoviny, tuky, sacharidy..."
+                  rows={3}
+                  placeholder="Energetická hodnota: 2259 kJ / 540 kcal. Tuky: 32 g..."
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Skladování
+                  Skladování (volitelné)
                 </label>
                 <input
                   type="text"
@@ -471,7 +470,7 @@ export default function Home() {
                     setLabelForm({ ...labelForm, vyrobce: e.target.value })
                   }
                   className="w-full border rounded-lg px-3 py-2"
-                  placeholder="Název a adresa výrobce"
+                  placeholder="Piaceri Mediterranei – Italy."
                 />
               </div>
             </div>

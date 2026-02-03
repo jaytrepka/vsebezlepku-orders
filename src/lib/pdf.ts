@@ -21,7 +21,7 @@ export interface LabelData {
   nazev: string;
   slozeni: string;
   nutricniHodnoty: string;
-  skladovani: string;
+  skladovani?: string;
   vyrobce: string;
 }
 
@@ -91,134 +91,188 @@ export async function generateLabelsPDF(
         const label = allLabels[labelIndex];
         labelIndex++;
 
-        // Calculate label position (top-left corner, Y from top)
+        // Calculate label position (top-left corner, Y from bottom in PDF)
         const x = MARGIN_X + col * LABEL_WIDTH;
         const y = A4_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
 
-        // Draw label border (optional, for debugging)
-        // page.drawRectangle({
-        //   x, y, width: LABEL_WIDTH, height: LABEL_HEIGHT,
-        //   borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5,
-        // });
-
-        // Draw label content
-        const padding = 4;
-        const contentX = x + padding;
-        let contentY = y + LABEL_HEIGHT - padding - 8;
+        const padding = 2;
+        const innerPadding = 3;
         const contentWidth = LABEL_WIDTH - 2 * padding;
+        const borderColor = rgb(0, 0, 0);
+        const lineWidth = 0.5;
 
-        // Title (název)
-        const titleSize = 7;
-        const titleLines = wrapText(label.nazev, contentWidth, titleSize, 0.5);
-        for (const line of titleLines.slice(0, 2)) {
+        // Draw outer border
+        page.drawRectangle({
+          x: x + padding,
+          y: y + padding,
+          width: LABEL_WIDTH - 2 * padding,
+          height: LABEL_HEIGHT - 2 * padding,
+          borderColor,
+          borderWidth: lineWidth,
+        });
+
+        let currentY = y + LABEL_HEIGHT - padding;
+
+        // === NAZEV section (product name box at top) ===
+        const nazevHeight = 16;
+        page.drawLine({
+          start: { x: x + padding, y: currentY - nazevHeight },
+          end: { x: x + LABEL_WIDTH - padding, y: currentY - nazevHeight },
+          color: borderColor,
+          thickness: lineWidth,
+        });
+
+        // Product name - bold, centered, wrapped if needed
+        const nazevSize = 6;
+        const nazevLines = wrapText(label.nazev, contentWidth - 4, nazevSize, 0.55);
+        const nazevLineHeight = nazevSize + 1;
+        const nazevTotalHeight = nazevLines.length * nazevLineHeight;
+        let nazevY = currentY - (nazevHeight - nazevTotalHeight) / 2 - nazevSize;
+        
+        for (const line of nazevLines.slice(0, 2)) {
+          const lineWidthPx = fontBold.widthOfTextAtSize(line, nazevSize);
           page.drawText(line, {
-            x: contentX,
-            y: contentY,
-            size: titleSize,
+            x: x + (LABEL_WIDTH - lineWidthPx) / 2,
+            y: nazevY,
+            size: nazevSize,
             font: fontBold,
             color: rgb(0, 0, 0),
           });
-          contentY -= titleSize + 1;
+          nazevY -= nazevLineHeight;
         }
+        currentY -= nazevHeight;
 
-        contentY -= 2;
+        // Calculate remaining height for content sections
+        const nutriHeight = 45;
+        const vyrobceHeight = label.skladovani ? 20 : 14;
+        const slozeniHeight = LABEL_HEIGHT - 2 * padding - nazevHeight - nutriHeight - vyrobceHeight;
 
-        // Složení
-        const textSize = 5;
+        // === SLOZENI section ===
+        page.drawLine({
+          start: { x: x + padding, y: currentY - slozeniHeight },
+          end: { x: x + LABEL_WIDTH - padding, y: currentY - slozeniHeight },
+          color: borderColor,
+          thickness: lineWidth,
+        });
+
+        const textSize = 4.5;
         const lineHeight = textSize + 1;
+        let textY = currentY - innerPadding - textSize;
+        const textX = x + padding + innerPadding;
+        const textWidth = contentWidth - 2 * innerPadding;
 
         page.drawText("Slozeni:", {
-          x: contentX,
-          y: contentY,
+          x: textX,
+          y: textY,
           size: textSize,
           font: fontBold,
           color: rgb(0, 0, 0),
         });
-        contentY -= lineHeight;
-
-        const slozeniLines = wrapText(label.slozeni, contentWidth, textSize, 0.45);
-        for (const line of slozeniLines.slice(0, 4)) {
-          page.drawText(line, {
-            x: contentX,
-            y: contentY,
+        
+        const slozeniText = label.slozeni;
+        const slozeniLines = wrapText(slozeniText, textWidth, textSize, 0.45);
+        
+        const slozeniPrefix = "Slozeni: ";
+        const prefixWidth = fontBold.widthOfTextAtSize(slozeniPrefix, textSize);
+        
+        if (slozeniLines.length > 0) {
+          const firstLineRemainder = wrapText(slozeniLines[0], textWidth - prefixWidth / 0.45 / textSize, textSize, 0.45);
+          page.drawText(firstLineRemainder[0] || slozeniLines[0], {
+            x: textX + prefixWidth,
+            y: textY,
             size: textSize,
             font,
             color: rgb(0, 0, 0),
           });
-          contentY -= lineHeight;
         }
+        textY -= lineHeight;
 
-        contentY -= 2;
+        const maxSlozeniLines = Math.floor((slozeniHeight - innerPadding * 2) / lineHeight) - 1;
+        for (let i = 1; i < Math.min(slozeniLines.length, maxSlozeniLines); i++) {
+          page.drawText(slozeniLines[i], {
+            x: textX,
+            y: textY,
+            size: textSize,
+            font,
+            color: rgb(0, 0, 0),
+          });
+          textY -= lineHeight;
+        }
+        currentY -= slozeniHeight;
 
-        // Nutriční hodnoty
-        page.drawText("Nutricni hodnoty:", {
-          x: contentX,
-          y: contentY,
+        // === NUTRICNI HODNOTY section ===
+        page.drawLine({
+          start: { x: x + padding, y: currentY - nutriHeight },
+          end: { x: x + LABEL_WIDTH - padding, y: currentY - nutriHeight },
+          color: borderColor,
+          thickness: lineWidth,
+        });
+
+        textY = currentY - innerPadding - textSize;
+        page.drawText("Nutricni hodnoty (na 100g):", {
+          x: textX,
+          y: textY,
           size: textSize,
           font: fontBold,
           color: rgb(0, 0, 0),
         });
-        contentY -= lineHeight;
+        textY -= lineHeight;
 
-        const nutriLines = wrapText(label.nutricniHodnoty, contentWidth, textSize, 0.45);
-        for (const line of nutriLines.slice(0, 4)) {
-          page.drawText(line, {
-            x: contentX,
-            y: contentY,
+        const nutriLines = wrapText(label.nutricniHodnoty, textWidth, textSize, 0.45);
+        for (let i = 0; i < Math.min(nutriLines.length, 6); i++) {
+          page.drawText(nutriLines[i], {
+            x: textX,
+            y: textY,
             size: textSize,
             font,
             color: rgb(0, 0, 0),
           });
-          contentY -= lineHeight;
+          textY -= lineHeight;
         }
+        currentY -= nutriHeight;
 
-        contentY -= 2;
-
-        // Skladování
-        page.drawText("Skladovani:", {
-          x: contentX,
-          y: contentY,
-          size: textSize,
-          font: fontBold,
-          color: rgb(0, 0, 0),
-        });
-        contentY -= lineHeight;
-
-        const skladLines = wrapText(label.skladovani, contentWidth, textSize, 0.45);
-        for (const line of skladLines.slice(0, 2)) {
-          page.drawText(line, {
-            x: contentX,
-            y: contentY,
+        // === VYROBCE section (bottom box, with optional skladovani) ===
+        textY = currentY - innerPadding - textSize;
+        
+        // Skladovani (if present)
+        if (label.skladovani) {
+          page.drawText("Skladovani:", {
+            x: textX,
+            y: textY,
+            size: textSize,
+            font: fontBold,
+            color: rgb(0, 0, 0),
+          });
+          const skladPrefix = "Skladovani: ";
+          const skladPrefixWidth = fontBold.widthOfTextAtSize(skladPrefix, textSize);
+          page.drawText(label.skladovani, {
+            x: textX + skladPrefixWidth,
+            y: textY,
             size: textSize,
             font,
             color: rgb(0, 0, 0),
           });
-          contentY -= lineHeight;
+          textY -= lineHeight;
         }
-
-        contentY -= 2;
-
-        // Výrobce
+        
+        // Vyrobce
         page.drawText("Vyrobce:", {
-          x: contentX,
-          y: contentY,
+          x: textX,
+          y: textY,
           size: textSize,
           font: fontBold,
           color: rgb(0, 0, 0),
         });
-        contentY -= lineHeight;
-
-        const vyrobceLines = wrapText(label.vyrobce, contentWidth, textSize, 0.45);
-        for (const line of vyrobceLines.slice(0, 2)) {
-          page.drawText(line, {
-            x: contentX,
-            y: contentY,
-            size: textSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-          contentY -= lineHeight;
-        }
+        
+        const vyrobcePrefix = "Vyrobce: ";
+        const vyrobcePrefixWidth = fontBold.widthOfTextAtSize(vyrobcePrefix, textSize);
+        page.drawText(label.vyrobce, {
+          x: textX + vyrobcePrefixWidth,
+          y: textY,
+          size: textSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
       }
     }
   }
