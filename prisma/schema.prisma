@@ -23,8 +23,9 @@ model OrderItem {
   productName String
   quantity    Int
   unitPrice   String?
+  labelId     String?
   order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  label       ProductLabel? @relation(fields: [productName], references: [productName])
+  label       ProductLabel? @relation(fields: [labelId], references: [id])
 }
 
 model ProductLabel {
