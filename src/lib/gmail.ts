@@ -108,12 +108,8 @@ export async function fetchOrderEmails(
   gmail: ReturnType<typeof google.gmail>,
   daysBack: number = 30
 ): Promise<ParsedOrder[]> {
-  const after = new Date();
-  after.setDate(after.getDate() - daysBack);
-  const afterStr = Math.floor(after.getTime() / 1000);
-
-  // Search for emails from vsebezlepku.cz
-  const query = `from:vsebezlepku.cz after:${afterStr}`;
+  // Try without date filter first to debug
+  const query = `from:vsebezlepku`;
   
   console.log("Gmail query:", query);
 
