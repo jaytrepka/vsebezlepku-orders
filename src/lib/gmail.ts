@@ -112,14 +112,18 @@ export async function fetchOrderEmails(
   after.setDate(after.getDate() - daysBack);
   const afterStr = Math.floor(after.getTime() / 1000);
 
-  // Simplified query - just search by sender and date
-  const query = `from:info@vsebezlepku.cz after:${afterStr}`;
+  // Search for emails from vsebezlepku.cz
+  const query = `from:vsebezlepku.cz after:${afterStr}`;
+  
+  console.log("Gmail query:", query);
 
   const response = await gmail.users.messages.list({
     userId: "me",
     q: query,
     maxResults: 100,
   });
+
+  console.log("Gmail response:", response.data.resultSizeEstimate, "results");
 
   const messages = response.data.messages || [];
   const orders: ParsedOrder[] = [];

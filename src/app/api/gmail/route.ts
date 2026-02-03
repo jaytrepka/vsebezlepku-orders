@@ -20,6 +20,14 @@ export async function POST(request: NextRequest) {
       refresh_token: refreshToken,
     });
 
+    // Debug: try a simple list first
+    const testList = await gmail.users.messages.list({
+      userId: "me",
+      maxResults: 5,
+    });
+    
+    console.log("Test list result:", testList.data.messages?.length || 0, "messages");
+
     const orders = await fetchOrderEmails(gmail, daysBack);
 
     // Save orders to database
@@ -60,11 +68,15 @@ export async function POST(request: NextRequest) {
       found: orders.length,
       saved: savedCount,
       skipped: skippedCount,
+      debug: {
+        totalEmails: testList.data.messages?.length || 0,
+        daysBack,
+      }
     });
   } catch (error) {
     console.error("Gmail fetch error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch emails" },
+      { error: "Failed to fetch emails", details: String(error) },
       { status: 500 }
     );
   }
