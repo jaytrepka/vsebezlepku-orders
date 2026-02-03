@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
             nazev: item.label.nazev,
             slozeni: item.label.slozeni,
             nutricniHodnoty: item.label.nutricniHodnoty,
-            skladovani: item.label.skladovani,
+            skladovani: item.label.skladovani ?? undefined,
             vyrobce: item.label.vyrobce,
           },
           quantity: item.quantity,
