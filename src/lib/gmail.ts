@@ -108,10 +108,15 @@ export async function fetchOrderEmails(
   gmail: ReturnType<typeof google.gmail>,
   daysBack: number = 30
 ): Promise<ParsedOrder[]> {
-  // No filter - just get recent emails to debug
+  // Search for order confirmations - the subject starts with www.vsebezlepku.cz
+  const query = `subject:"Potvrzení objednávky"`;
+  
+  console.log("Gmail query:", query);
+
   const response = await gmail.users.messages.list({
     userId: "me",
-    maxResults: 10,
+    q: query,
+    maxResults: 100,
   });
 
   console.log("Gmail response:", response.data.resultSizeEstimate, "results");
@@ -122,7 +127,7 @@ export async function fetchOrderEmails(
   
   // Get subjects of first few emails for debugging
   const debugSubjects: string[] = [];
-  for (const message of messages.slice(0, 3)) {
+  for (const message of messages.slice(0, 5)) {
     const fullMessage = await gmail.users.messages.get({
       userId: "me",
       id: message.id!,
