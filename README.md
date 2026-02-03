@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VšeBezLepku Objednávky
 
-## Getting Started
+Webová aplikace pro správu objednávek z e-shopu vsebezlepku.cz a generování štítků na produkty.
 
-First, run the development server:
+## Funkce
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- 📧 **Synchronizace emailů** - Čte potvrzovací emaily z Gmailu a extrahuje objednávky
+- 📦 **Správa objednávek** - Přehled všech objednávek s produkty
+- 🏷️ **Štítky produktů** - Vytvoření štítků s informacemi (složení, nutriční hodnoty, atd.)
+- 🖨️ **Generování PDF** - Export štítků na A4 (24 pozic, 36×70mm) s volitelnou počáteční pozicí
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Technologie
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- Prisma + PostgreSQL
+- Gmail API
+- pdf-lib
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Instalace
 
-## Learn More
+1. Klonujte repozitář
+2. Nainstalujte závislosti:
+   ```bash
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+3. Vytvořte `.env` soubor podle `.env.example`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Nastavte Google Cloud projekt:
+   - Přejděte na https://console.cloud.google.com/
+   - Vytvořte nový projekt
+   - Povolte Gmail API
+   - Vytvořte OAuth 2.0 credentials
+   - Nastavte redirect URI: `http://localhost:3000/api/auth/callback`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. Spusťte migrace databáze:
+   ```bash
+   npx prisma migrate dev
+   ```
 
-## Deploy on Vercel
+6. Spusťte vývojový server:
+   ```bash
+   npm run dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Použití
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Připojte Gmail účet kliknutím na "Připojit Gmail"
+2. Nastavte počet dní zpět a synchronizujte emaily
+3. Pro produkty bez štítků klikněte na "Přidat štítek" a vyplňte údaje
+4. Vyberte objednávky, nastavte počáteční pozici a klikněte na "Generovat štítky"
+
+## Štítky
+
+Formát štítků: A4 papír s 24 pozicemi (3 sloupce × 8 řádků)
+- Rozměr štítku: 36 × 70 mm
+- Obsah: Název, Složení, Nutriční hodnoty, Skladování, Výrobce
+
+## Licence
+
+MIT

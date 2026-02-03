@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  emailDate   DateTime
+  rawEmail    String?
+  totalPrice  String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id          String        @id @default(cuid())
+  orderId     String
+  productName String
+  quantity    Int
+  unitPrice   String?
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  label       ProductLabel? @relation(fields: [productName], references: [productName])
+}
+
+model ProductLabel {
+  id              String      @id @default(cuid())
+  productName     String      @unique
+  nazev           String      // Display name
+  slozeni         String      // Ingredients
+  nutricniHodnoty String      // Nutrition facts
+  skladovani      String      // Storage instructions
+  vyrobce         String      // Manufacturer
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orderItems      OrderItem[]
+}
