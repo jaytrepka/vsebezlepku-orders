@@ -112,7 +112,8 @@ export async function fetchOrderEmails(
   after.setDate(after.getDate() - daysBack);
   const afterStr = Math.floor(after.getTime() / 1000);
 
-  const query = `from:info@vsebezlepku.cz subject:"Potvrzení objednávky" after:${afterStr}`;
+  // Simplified query - just search by sender and date
+  const query = `from:info@vsebezlepku.cz after:${afterStr}`;
 
   const response = await gmail.users.messages.list({
     userId: "me",
