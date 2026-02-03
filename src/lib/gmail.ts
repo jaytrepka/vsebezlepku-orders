@@ -39,7 +39,8 @@ export interface ParsedOrder {
 
 export function parseOrderEmail(emailBody: string, emailDate: Date): ParsedOrder | null {
   // Extract order number: Oxxxxxxxxxx pattern
-  const orderNumberMatch = emailBody.match(/O\d{10}/);
+  // Order numbers are like O202600072 (O + 9 digits)
+  const orderNumberMatch = emailBody.match(/O\d{9}/);
   if (!orderNumberMatch) return null;
 
   const orderNumber = orderNumberMatch[0];
