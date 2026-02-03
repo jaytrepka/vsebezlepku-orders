@@ -108,8 +108,8 @@ export async function fetchOrderEmails(
   gmail: ReturnType<typeof google.gmail>,
   daysBack: number = 30
 ): Promise<ParsedOrder[]> {
-  // Try without date filter first to debug
-  const query = `from:vsebezlepku`;
+  // Search by subject containing order confirmation
+  const query = `subject:vsebezlepku`;
   
   console.log("Gmail query:", query);
 
