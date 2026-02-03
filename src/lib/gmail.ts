@@ -108,21 +108,35 @@ export async function fetchOrderEmails(
   gmail: ReturnType<typeof google.gmail>,
   daysBack: number = 30
 ): Promise<ParsedOrder[]> {
-  // Search by subject containing order confirmation
-  const query = `subject:vsebezlepku`;
-  
-  console.log("Gmail query:", query);
-
+  // No filter - just get recent emails to debug
   const response = await gmail.users.messages.list({
     userId: "me",
-    q: query,
-    maxResults: 100,
+    maxResults: 10,
   });
 
   console.log("Gmail response:", response.data.resultSizeEstimate, "results");
+  console.log("Messages:", response.data.messages);
 
   const messages = response.data.messages || [];
   const orders: ParsedOrder[] = [];
+  
+  // Get subjects of first few emails for debugging
+  const debugSubjects: string[] = [];
+  for (const message of messages.slice(0, 3)) {
+    const fullMessage = await gmail.users.messages.get({
+      userId: "me",
+      id: message.id!,
+      format: "metadata",
+      metadataHeaders: ["Subject", "From"],
+    });
+    const headers = fullMessage.data.payload?.headers || [];
+    const subject = headers.find((h) => h.name === "Subject")?.value || "no subject";
+    const from = headers.find((h) => h.name === "From")?.value || "no from";
+    debugSubjects.push(`${from} | ${subject}`);
+  }
+  
+  // Store debug info to return
+  (fetchOrderEmails as any).debugSubjects = debugSubjects;
 
   for (const message of messages) {
     const fullMessage = await gmail.users.messages.get({

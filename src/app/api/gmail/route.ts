@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     console.log("Test list result:", testList.data.messages?.length || 0, "messages");
 
     const orders = await fetchOrderEmails(gmail, daysBack);
+    const debugSubjects = (fetchOrderEmails as any).debugSubjects || [];
 
     // Save orders to database
     let savedCount = 0;
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       debug: {
         totalEmails: testList.data.messages?.length || 0,
         daysBack,
+        recentEmails: debugSubjects,
       }
     });
   } catch (error) {
