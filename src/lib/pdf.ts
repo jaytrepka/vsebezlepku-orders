@@ -1,4 +1,7 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import * as fs from "fs";
+import * as path from "path";
 
 // A4 dimensions in points (1 point = 1/72 inch)
 const A4_WIDTH = 595.28;
@@ -56,8 +59,19 @@ export async function generateLabelsPDF(
   startPosition: number = 1
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+  // Register fontkit for custom font support
+  pdfDoc.registerFontkit(fontkit);
+  
+  // Load custom fonts that support Czech characters
+  const fontPath = path.join(process.cwd(), "public", "fonts", "NotoSans-Regular.ttf");
+  const fontBoldPath = path.join(process.cwd(), "public", "fonts", "NotoSans-Bold.ttf");
+  
+  const fontBytes = fs.readFileSync(fontPath);
+  const fontBoldBytes = fs.readFileSync(fontBoldPath);
+  
+  const font = await pdfDoc.embedFont(fontBytes);
+  const fontBold = await pdfDoc.embedFont(fontBoldBytes);
 
   // Flatten labels by quantity
   const allLabels: LabelData[] = [];
