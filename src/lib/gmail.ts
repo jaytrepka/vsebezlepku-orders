@@ -44,44 +44,34 @@ export function parseOrderEmail(emailBody: string, emailDate: Date): ParsedOrder
 
   const orderNumber = orderNumberMatch[0];
 
-  // Parse items from the email
-  // Format:
-  // Product Name
-  // Množství: X ks
-  // Cena za m. j.: XXX Kč
-  // Kód: XXX
-  // XXX Kč
+  // Parse items from the email - Shoptet format with lots of whitespace
+  // Format in email:
+  //    ProductName
+  //    Množství: X ks
+  //    Cena za m. j.: XXX Kč
+  //    Kód: XXX
   const items: { productName: string; quantity: number; unitPrice?: string }[] = [];
 
-  // Pattern to match product blocks:
-  // Look for lines followed by "Množství: X ks"
-  const productPattern = /([^\n<>]{10,200})\s*(?:<[^>]*>)*\s*Množství:\s*(\d+)\s*ks\s*(?:<[^>]*>)*\s*Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/gi;
+  // Normalize whitespace - collapse multiple spaces/newlines but keep structure
+  const normalizedBody = emailBody.replace(/[\t ]+/g, ' ');
+  
+  // Pattern: ProductName followed by Množství on same or next line
+  // Product names typically contain letters, numbers, parentheses, hyphens
+  const productPattern = /([A-ZÁ-Ža-zá-ž0-9][A-ZÁ-Ža-zá-ž0-9\s\-\(\)%,\.\/]+?)\s+Množství:\s*(\d+)\s*ks\s+Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/g;
   
   let match;
-  while ((match = productPattern.exec(emailBody)) !== null) {
+  while ((match = productPattern.exec(normalizedBody)) !== null) {
     let productName = match[1].trim();
-    // Clean up HTML tags and entities
-    productName = productName.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-    // Remove trailing whitespace and common suffixes
-    productName = productName.replace(/\s+$/, '');
+    // Clean up extra whitespace within the name
+    productName = productName.replace(/\s+/g, ' ').trim();
     
     const quantity = parseInt(match[2], 10);
     const unitPrice = match[3].replace(',', '.') + ' Kč';
 
-    if (productName && productName.length > 5 && quantity > 0) {
+    // Filter out false positives - product names should be at least 10 chars
+    // and not be just numbers or common words
+    if (productName && productName.length >= 10 && quantity > 0 && !/^\d+$/.test(productName)) {
       items.push({ productName, quantity, unitPrice });
-    }
-  }
-
-  // Alternative: try simpler pattern if no items found
-  if (items.length === 0) {
-    const simplePattern = /([A-ZÁ-Ž][^\n]{5,150})\n\s*Množství:\s*(\d+)\s*ks/gi;
-    while ((match = simplePattern.exec(emailBody)) !== null) {
-      const productName = match[1].trim();
-      const quantity = parseInt(match[2], 10);
-      if (productName && quantity > 0) {
-        items.push({ productName, quantity });
-      }
     }
   }
 
