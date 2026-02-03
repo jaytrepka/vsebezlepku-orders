@@ -38,56 +38,49 @@ export interface ParsedOrder {
 }
 
 export function parseOrderEmail(emailBody: string, emailDate: Date): ParsedOrder | null {
-  // Extract order number: Oxxxxxxxxxx pattern
-  // Order numbers are like O202600072 (O + 9 digits)
+  // Extract order number: O + 9 digits (e.g., O202600072)
   const orderNumberMatch = emailBody.match(/O\d{9}/);
   if (!orderNumberMatch) return null;
 
   const orderNumber = orderNumberMatch[0];
 
-  // Parse items from the email - vsebezlepku uses HTML tables
+  // Parse items from the email
+  // Format:
+  // Product Name
+  // Množství: X ks
+  // Cena za m. j.: XXX Kč
+  // Kód: XXX
+  // XXX Kč
   const items: { productName: string; quantity: number; unitPrice?: string }[] = [];
 
-  // Pattern for items: Product name, quantity, price
-  // This regex looks for table rows with product info
-  const itemPattern = /<td[^>]*>([^<]+)<\/td>\s*<td[^>]*>(\d+)\s*ks<\/td>\s*<td[^>]*>([^<]+)<\/td>/gi;
+  // Pattern to match product blocks:
+  // Look for lines followed by "Množství: X ks"
+  const productPattern = /([^\n<>]{10,200})\s*(?:<[^>]*>)*\s*Množství:\s*(\d+)\s*ks\s*(?:<[^>]*>)*\s*Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/gi;
+  
   let match;
-
-  while ((match = itemPattern.exec(emailBody)) !== null) {
-    const productName = match[1].trim();
+  while ((match = productPattern.exec(emailBody)) !== null) {
+    let productName = match[1].trim();
+    // Clean up HTML tags and entities
+    productName = productName.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    // Remove trailing whitespace and common suffixes
+    productName = productName.replace(/\s+$/, '');
+    
     const quantity = parseInt(match[2], 10);
-    const unitPrice = match[3].trim();
+    const unitPrice = match[3].replace(',', '.') + ' Kč';
 
-    if (productName && quantity > 0) {
+    if (productName && productName.length > 5 && quantity > 0) {
       items.push({ productName, quantity, unitPrice });
     }
   }
 
-  // Alternative pattern for plain text emails
+  // Alternative: try simpler pattern if no items found
   if (items.length === 0) {
-    const plainItemPattern = /(\d+)\s*[xX×]\s*(.+?)\s*[-–]\s*(\d+[,.]?\d*)\s*Kč/g;
-    while ((match = plainItemPattern.exec(emailBody)) !== null) {
-      const quantity = parseInt(match[1], 10);
-      const productName = match[2].trim();
-      const unitPrice = match[3].trim() + " Kč";
-
+    const simplePattern = /([A-ZÁ-Ž][^\n]{5,150})\n\s*Množství:\s*(\d+)\s*ks/gi;
+    while ((match = simplePattern.exec(emailBody)) !== null) {
+      const productName = match[1].trim();
+      const quantity = parseInt(match[2], 10);
       if (productName && quantity > 0) {
-        items.push({ productName, quantity, unitPrice });
-      }
-    }
-  }
-
-  // Try another common format
-  if (items.length === 0) {
-    const lines = emailBody.split(/\n|\r\n/);
-    for (const line of lines) {
-      const lineMatch = line.match(/(.+?)\s+(\d+)\s*(?:ks|x)\s*(?:[\d,.]+\s*Kč)?/i);
-      if (lineMatch) {
-        const productName = lineMatch[1].trim();
-        const quantity = parseInt(lineMatch[2], 10);
-        if (productName.length > 3 && productName.length < 100 && quantity > 0) {
-          items.push({ productName, quantity });
-        }
+        items.push({ productName, quantity });
       }
     }
   }
