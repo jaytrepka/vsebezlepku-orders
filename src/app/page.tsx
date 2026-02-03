@@ -1,21 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, Mail, FileText, Plus, Trash2, Printer } from "lucide-react";
+import { Package, Mail, FileText, Plus, Trash2, Printer, Edit2 } from "lucide-react";
+
+interface ProductLabel {
+  id: string;
+  nazev: string;
+  slozeni: string;
+  nutricniHodnoty: string;
+  skladovani?: string;
+  vyrobce: string;
+}
 
 interface OrderItem {
   id: string;
   productName: string;
   quantity: number;
   unitPrice?: string;
-  label?: {
-    id: string;
-    nazev: string;
-    slozeni: string;
-    nutricniHodnoty: string;
-    skladovani?: string;
-    vyrobce: string;
-  } | null;
+  productUrl?: string;
+  label?: ProductLabel | null;
 }
 
 interface Order {
@@ -36,6 +39,8 @@ export default function Home() {
   const [labelModal, setLabelModal] = useState<{
     open: boolean;
     productName: string;
+    productUrl?: string;
+    isEdit: boolean;
   } | null>(null);
   const [labelForm, setLabelForm] = useState({
     nazev: "",
@@ -44,6 +49,7 @@ export default function Home() {
     skladovani: "",
     vyrobce: "",
   });
+  const [fetchingProductInfo, setFetchingProductInfo] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -183,15 +189,55 @@ export default function Home() {
     }
   }
 
-  function openLabelModal(productName: string) {
-    setLabelModal({ open: true, productName });
-    setLabelForm({
-      nazev: productName,
-      slozeni: "",
-      nutricniHodnoty: "",
-      skladovani: "",
-      vyrobce: "",
-    });
+  function openLabelModal(productName: string, existingLabel?: ProductLabel | null, productUrl?: string) {
+    setLabelModal({ open: true, productName, productUrl, isEdit: !!existingLabel });
+    if (existingLabel) {
+      setLabelForm({
+        nazev: existingLabel.nazev,
+        slozeni: existingLabel.slozeni,
+        nutricniHodnoty: existingLabel.nutricniHodnoty,
+        skladovani: existingLabel.skladovani || "",
+        vyrobce: existingLabel.vyrobce,
+      });
+    } else {
+      setLabelForm({
+        nazev: productName,
+        slozeni: "",
+        nutricniHodnoty: "",
+        skladovani: "",
+        vyrobce: "",
+      });
+    }
+  }
+
+  async function fetchProductInfo() {
+    if (!labelModal?.productUrl) return;
+    
+    setFetchingProductInfo(true);
+    try {
+      const res = await fetch("/api/labels/fetch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productUrl: labelModal.productUrl }),
+      });
+      const data = await res.json();
+      
+      if (data.error) {
+        setMessage({ type: "error", text: "Nepodařilo se načíst data z produktové stránky" });
+      } else {
+        setLabelForm((prev) => ({
+          nazev: data.nazev || prev.nazev,
+          slozeni: data.slozeni || prev.slozeni,
+          nutricniHodnoty: data.nutricniHodnoty || prev.nutricniHodnoty,
+          skladovani: data.skladovani || prev.skladovani,
+          vyrobce: data.vyrobce || prev.vyrobce,
+        }));
+        setMessage({ type: "success", text: "Data načtena z produktové stránky" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při načítání produktové stránky" });
+    }
+    setFetchingProductInfo(false);
   }
 
   return (
@@ -352,12 +398,16 @@ export default function Home() {
                             {item.productName}
                           </span>
                           {item.label ? (
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                            <button
+                              onClick={() => openLabelModal(item.productName, item.label, item.productUrl)}
+                              className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                            >
+                              <Edit2 className="w-3 h-3" />
                               Štítek ✓
-                            </span>
+                            </button>
                           ) : (
                             <button
-                              onClick={() => openLabelModal(item.productName)}
+                              onClick={() => openLabelModal(item.productName, null, item.productUrl)}
                               className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1"
                             >
                               <Plus className="w-3 h-3" />
@@ -386,14 +436,24 @@ export default function Home() {
       {/* Label Modal */}
       {labelModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Vytvořit štítek
+              {labelModal.isEdit ? "Upravit štítek" : "Vytvořit štítek"}
             </h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-600 mb-2">
               Produkt: <strong>{labelModal.productName}</strong>
             </p>
+            
+            {labelModal.productUrl && !labelModal.isEdit && (
+              <button
+                onClick={fetchProductInfo}
+                disabled={fetchingProductInfo}
+                className="mb-4 bg-purple-600 text-white px-3 py-1.5 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
+              >
+                {fetchingProductInfo ? "Načítám..." : "📥 Načíst data z webu"}
+              </button>
+            )}
 
             <div className="space-y-4">
               <div>

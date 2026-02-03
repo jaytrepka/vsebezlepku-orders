@@ -20,31 +20,25 @@ export async function POST(request: NextRequest) {
       refresh_token: refreshToken,
     });
 
-    // Debug: try a simple list first
-    const testList = await gmail.users.messages.list({
-      userId: "me",
-      maxResults: 5,
+    // Get existing order numbers to skip
+    const existingOrders = await prisma.order.findMany({
+      select: { orderNumber: true },
     });
-    
-    console.log("Test list result:", testList.data.messages?.length || 0, "messages");
+    const existingOrderNumbers = existingOrders.map((o) => o.orderNumber);
 
-    const orders = await fetchOrderEmails(gmail, daysBack);
+    const orders = await fetchOrderEmails(gmail, daysBack, existingOrderNumbers);
     const debugSubjects = (fetchOrderEmails as any).debugSubjects || [];
 
     // Save orders to database
     let savedCount = 0;
-    let skippedCount = 0;
 
     for (const order of orders) {
-      // Check if order already exists
-      const existing = await prisma.order.findUnique({
-        where: { orderNumber: order.orderNumber },
+      // Get existing labels for product names
+      const productNames = order.items.map((item) => item.productName);
+      const existingLabels = await prisma.productLabel.findMany({
+        where: { productName: { in: productNames } },
       });
-
-      if (existing) {
-        skippedCount++;
-        continue;
-      }
+      const labelMap = new Map(existingLabels.map((l) => [l.productName, l.id]));
 
       await prisma.order.create({
         data: {
@@ -57,6 +51,8 @@ export async function POST(request: NextRequest) {
               productName: item.productName,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
+              productUrl: item.productUrl,
+              labelId: labelMap.get(item.productName) || null,
             })),
           },
         },
@@ -68,9 +64,8 @@ export async function POST(request: NextRequest) {
       success: true,
       found: orders.length,
       saved: savedCount,
-      skipped: skippedCount,
+      skipped: existingOrderNumbers.length,
       debug: {
-        totalEmails: testList.data.messages?.length || 0,
         daysBack,
         recentEmails: debugSubjects,
       }

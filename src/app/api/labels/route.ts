@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const labels = await prisma.productLabel.findMany({
       orderBy: { productName: "asc" },
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         nazev: data.nazev,
         slozeni: data.slozeni,
         nutricniHodnoty: data.nutricniHodnoty,
-        skladovani: data.skladovani,
+        skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
       },
       create: {
@@ -35,9 +35,15 @@ export async function POST(request: NextRequest) {
         nazev: data.nazev,
         slozeni: data.slozeni,
         nutricniHodnoty: data.nutricniHodnoty,
-        skladovani: data.skladovani,
+        skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
       },
+    });
+
+    // Link this label to all existing OrderItems with the same productName
+    await prisma.orderItem.updateMany({
+      where: { productName: data.productName },
+      data: { labelId: label.id },
     });
 
     return NextResponse.json(label);

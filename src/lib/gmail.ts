@@ -29,9 +29,16 @@ export async function getGmailClient(tokens: { access_token?: string | null; ref
   return google.gmail({ version: "v1", auth: oauth2Client });
 }
 
+export interface ParsedOrderItem {
+  productName: string;
+  quantity: number;
+  unitPrice?: string;
+  productUrl?: string;
+}
+
 export interface ParsedOrder {
   orderNumber: string;
-  items: { productName: string; quantity: number; unitPrice?: string }[];
+  items: ParsedOrderItem[];
   totalPrice?: string;
   emailDate: Date;
   rawEmail: string;
@@ -45,25 +52,41 @@ export function parseOrderEmail(emailBody: string, emailDate: Date): ParsedOrder
   const orderNumber = orderNumberMatch[0];
 
   // Parse items from the email - Shoptet HTML format
-  // Product name is in <a title="ProductName">ProductName</a>
+  // Product name is in <a href="productUrl" title="ProductName">ProductName</a>
   // Followed by: Množství: X ks<br /> Cena za m. j.: XXX Kč
-  const items: { productName: string; quantity: number; unitPrice?: string }[] = [];
+  const items: ParsedOrderItem[] = [];
 
-  // Pattern 1: Extract from <a title="..."> tags followed by quantity
-  const htmlPattern = /<a[^>]+title="([^"]+)"[^>]*>[^<]*<\/a>[\s\S]*?Množství:\s*(\d+)\s*ks[\s\S]*?Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/gi;
+  // Pattern 1: Extract from <a href="..." title="..."> tags followed by quantity
+  const htmlPattern = /<a\s+href="([^"]+)"[^>]*title="([^"]+)"[^>]*>[^<]*<\/a>[\s\S]*?Množství:\s*(\d+)\s*ks[\s\S]*?Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/gi;
   
   let match;
   while ((match = htmlPattern.exec(emailBody)) !== null) {
-    const productName = match[1].trim();
-    const quantity = parseInt(match[2], 10);
-    const unitPrice = match[3].replace(',', '.') + ' Kč';
+    const productUrl = match[1].trim();
+    const productName = match[2].trim();
+    const quantity = parseInt(match[3], 10);
+    const unitPrice = match[4].replace(',', '.') + ' Kč';
 
     if (productName && productName.length >= 5 && quantity > 0) {
-      items.push({ productName, quantity, unitPrice });
+      items.push({ productName, quantity, unitPrice, productUrl });
     }
   }
 
-  // Pattern 2: Fallback for plain text format
+  // Pattern 2: Try without href if pattern 1 didn't match
+  if (items.length === 0) {
+    const simpleHtmlPattern = /<a[^>]+title="([^"]+)"[^>]*>[^<]*<\/a>[\s\S]*?Množství:\s*(\d+)\s*ks[\s\S]*?Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/gi;
+    
+    while ((match = simpleHtmlPattern.exec(emailBody)) !== null) {
+      const productName = match[1].trim();
+      const quantity = parseInt(match[2], 10);
+      const unitPrice = match[3].replace(',', '.') + ' Kč';
+
+      if (productName && productName.length >= 5 && quantity > 0) {
+        items.push({ productName, quantity, unitPrice });
+      }
+    }
+  }
+
+  // Pattern 3: Fallback for plain text format
   if (items.length === 0) {
     const normalizedBody = emailBody.replace(/[\t ]+/g, ' ');
     const plainPattern = /([A-ZÁ-Ža-zá-ž0-9][A-ZÁ-Ža-zá-ž0-9\s\-\(\)%,\.\/]+?)\s+Množství:\s*(\d+)\s*ks\s+Cena za m\. j\.:\s*(\d+(?:[,.]\d+)?)\s*Kč/g;
@@ -94,10 +117,16 @@ export function parseOrderEmail(emailBody: string, emailDate: Date): ParsedOrder
 
 export async function fetchOrderEmails(
   gmail: ReturnType<typeof google.gmail>,
-  daysBack: number = 30
+  daysBack: number = 30,
+  existingOrderNumbers: string[] = []
 ): Promise<ParsedOrder[]> {
-  // Search for order confirmations - the subject starts with www.vsebezlepku.cz
-  const query = `subject:"Potvrzení objednávky"`;
+  // Calculate date for query
+  const afterDate = new Date();
+  afterDate.setDate(afterDate.getDate() - daysBack);
+  const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+  
+  // Search for order confirmations with date filter
+  const query = `subject:"Potvrzení objednávky" after:${afterTimestamp}`;
   
   console.log("Gmail query:", query);
 
@@ -108,7 +137,6 @@ export async function fetchOrderEmails(
   });
 
   console.log("Gmail response:", response.data.resultSizeEstimate, "results");
-  console.log("Messages:", response.data.messages);
 
   const messages = response.data.messages || [];
   const orders: ParsedOrder[] = [];
@@ -163,6 +191,10 @@ export async function fetchOrderEmails(
     if (body) {
       const parsed = parseOrderEmail(body, emailDate);
       if (parsed) {
+        // Skip if we already have this order
+        if (existingOrderNumbers.includes(parsed.orderNumber)) {
+          continue;
+        }
         orders.push(parsed);
       }
     }
