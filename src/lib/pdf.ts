@@ -1,13 +1,10 @@
 import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
-// Base64 encoded Noto Sans Regular (subset for Czech)
-// This avoids file system issues on Vercel serverless
+// Load fonts via HTTP - works on Vercel serverless
 async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }> {
-  // In development, use local files; in production on Vercel, use fetch from public URL
-  const baseUrl = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  // Use the production URL directly
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vsebezlepku-orders.vercel.app';
   
   console.log("Loading fonts from:", baseUrl);
   
@@ -111,10 +108,27 @@ export async function generateLabelsPDF(
   console.log("PDF Generation: totalLabels =", totalLabels, ", startIndex =", startIndex, ", totalPages =", totalPages);
   console.log("Grid:", COLS, "x", ROWS, "= 24 labels");
   console.log("Margins:", MARGIN_X.toFixed(2), "x", MARGIN_Y.toFixed(2));
+  console.log("Label dimensions:", LABEL_WIDTH.toFixed(2), "x", LABEL_HEIGHT.toFixed(2));
 
   for (let pageNum = 0; pageNum < totalPages; pageNum++) {
     const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
     console.log("Added page", pageNum + 1, "size:", A4_WIDTH, "x", A4_HEIGHT);
+    
+    // DEBUG: Draw a test marker at top-left corner to verify PDF is rendering
+    page.drawRectangle({
+      x: 10,
+      y: A4_HEIGHT - 30,
+      width: 100,
+      height: 20,
+      color: rgb(1, 0, 0),
+    });
+    page.drawText("DEBUG TEST", {
+      x: 15,
+      y: A4_HEIGHT - 25,
+      size: 10,
+      font: fontBold,
+      color: rgb(1, 1, 1),
+    });
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
