@@ -108,30 +108,29 @@ function findOptimalFontSize(
   fontBold: PDFFont
 ): number {
   const minSize = 3;
-  const maxSize = 9;
+  const maxSize = 12;
   
-  for (let size = maxSize; size >= minSize; size -= 0.5) {
-    const lineHeight = size * 1.3;
-    const titleLineHeight = (size + 1) * 1.3;
+  for (let size = maxSize; size >= minSize; size -= 0.25) {
+    const lineHeight = size * 1.15;
+    const titleLineHeight = (size + 1) * 1.15;
     
     // Calculate title lines
     const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
-    let totalHeight = titleLines.length * titleLineHeight + 4; // title + separator space
+    let totalHeight = titleLines.length * titleLineHeight + 3; // title + separator space
     
     // Složení section
     const slozeniLines = wrapTextWithFont("Složení: " + label.slozeni, contentWidth, size, font);
-    totalHeight += slozeniLines.length * lineHeight + 2;
+    totalHeight += slozeniLines.length * lineHeight + 1;
     
     // Nutriční hodnoty section
-    const nutriHeader = "Nutriční hodnoty (100g):";
     totalHeight += lineHeight; // header
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
-    totalHeight += nutriLines.length * lineHeight + 2;
+    totalHeight += nutriLines.length * lineHeight + 1;
     
     // Info (optional) - no prefix
     if (label.skladovani) {
       const infoLines = wrapTextWithFont(label.skladovani, contentWidth, size, font);
-      totalHeight += infoLines.length * lineHeight + 2;
+      totalHeight += infoLines.length * lineHeight + 1;
     }
     
     // Výrobce
@@ -173,9 +172,9 @@ function drawLabel(
   
   // Find optimal font size
   const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 4, font, fontBold);
-  const lineHeight = fontSize * 1.3;
+  const lineHeight = fontSize * 1.15;
   const titleSize = fontSize + 1;
-  const titleLineHeight = titleSize * 1.3;
+  const titleLineHeight = titleSize * 1.15;
   
   let currentY = y + LABEL_HEIGHT - padding - 2;
   const textX = x + padding + 2;
