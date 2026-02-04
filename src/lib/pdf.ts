@@ -87,8 +87,21 @@ function getSegmentedTextWidth(segments: TextSegment[], fontSize: number, font: 
 }
 
 // Wrap text using actual font measurements
+// Keeps punctuation attached to preceding word (e.g., "mléko." stays together)
 function wrapTextWithFont(text: string, maxWidth: number, fontSize: number, font: PDFFont): string[] {
-  const words = text.split(/\s+/);
+  // Split but keep punctuation attached to previous word
+  const rawWords = text.split(/\s+/);
+  const words: string[] = [];
+  
+  for (const word of rawWords) {
+    // If word is just punctuation and we have a previous word, attach it
+    if (/^[.,;:!?]+$/.test(word) && words.length > 0) {
+      words[words.length - 1] += word;
+    } else {
+      words.push(word);
+    }
+  }
+  
   const lines: string[] = [];
   let currentLine = "";
 
@@ -110,10 +123,21 @@ function wrapTextWithFont(text: string, maxWidth: number, fontSize: number, font
 }
 
 // Wrap text with bold markers preserved, returning lines as segment arrays
+// Keeps punctuation attached to preceding word (e.g., "mléko." stays together)
 function wrapTextWithBold(text: string, maxWidth: number, fontSize: number, font: PDFFont, fontBold: PDFFont): TextSegment[][] {
   // Remove ** markers for word splitting but track positions
   const plainText = text.replace(/\*\*/g, '');
-  const words = plainText.split(/\s+/);
+  const rawWords = plainText.split(/\s+/);
+  
+  // Keep punctuation attached to previous word
+  const words: string[] = [];
+  for (const word of rawWords) {
+    if (/^[.,;:!?]+$/.test(word) && words.length > 0) {
+      words[words.length - 1] += word;
+    } else {
+      words.push(word);
+    }
+  }
   
   // Track bold ranges in plain text
   const boldRanges: { start: number; end: number }[] = [];
@@ -247,8 +271,9 @@ function findOptimalFontSize(
     const slozeniLines = wrapTextWithFont(slozeniPlain, contentWidth, size, font);
     totalHeight += slozeniLines.length * lineHeight + 1;
     
-    // Nutriční hodnoty section
-    totalHeight += lineHeight; // header
+    // Nutriční hodnoty section (header line + content)
+    const nutriHeader = "Nutriční hodnoty (100g):";
+    totalHeight += lineHeight; // header line
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
     totalHeight += nutriLines.length * lineHeight + 1;
     
