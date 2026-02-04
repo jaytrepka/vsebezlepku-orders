@@ -48,6 +48,44 @@ export interface LabelRequest {
   quantity: number;
 }
 
+// Text segment with optional bold flag
+interface TextSegment {
+  text: string;
+  bold: boolean;
+}
+
+// Parse text with **bold** markers into segments
+function parseTextWithBold(text: string): TextSegment[] {
+  const segments: TextSegment[] = [];
+  const regex = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Add regular text before this match
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index), bold: false });
+    }
+    // Add bold text
+    segments.push({ text: match[1], bold: true });
+    lastIndex = regex.lastIndex;
+  }
+  // Add remaining regular text
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), bold: false });
+  }
+  return segments;
+}
+
+// Calculate width of text with bold segments
+function getSegmentedTextWidth(segments: TextSegment[], fontSize: number, font: PDFFont, fontBold: PDFFont): number {
+  let totalWidth = 0;
+  for (const seg of segments) {
+    totalWidth += (seg.bold ? fontBold : font).widthOfTextAtSize(seg.text, fontSize);
+  }
+  return totalWidth;
+}
+
 // Wrap text using actual font measurements
 function wrapTextWithFont(text: string, maxWidth: number, fontSize: number, font: PDFFont): string[] {
   const words = text.split(/\s+/);
@@ -69,6 +107,92 @@ function wrapTextWithFont(text: string, maxWidth: number, fontSize: number, font
   if (currentLine) lines.push(currentLine);
 
   return lines;
+}
+
+// Wrap text with bold markers preserved, returning lines as segment arrays
+function wrapTextWithBold(text: string, maxWidth: number, fontSize: number, font: PDFFont, fontBold: PDFFont): TextSegment[][] {
+  // Remove ** markers for word splitting but track positions
+  const plainText = text.replace(/\*\*/g, '');
+  const words = plainText.split(/\s+/);
+  
+  // Track bold ranges in plain text
+  const boldRanges: { start: number; end: number }[] = [];
+  let plainIndex = 0;
+  let originalIndex = 0;
+  
+  while (originalIndex < text.length) {
+    if (text.slice(originalIndex, originalIndex + 2) === '**') {
+      originalIndex += 2;
+      const startPlain = plainIndex;
+      // Find closing **
+      const closeIdx = text.indexOf('**', originalIndex);
+      if (closeIdx !== -1) {
+        const boldText = text.slice(originalIndex, closeIdx);
+        boldRanges.push({ start: startPlain, end: startPlain + boldText.length });
+        plainIndex += boldText.length;
+        originalIndex = closeIdx + 2;
+      }
+    } else {
+      plainIndex++;
+      originalIndex++;
+    }
+  }
+  
+  // Function to check if a character position is bold
+  const isBold = (pos: number) => boldRanges.some(r => pos >= r.start && pos < r.end);
+  
+  // Wrap into lines
+  const lines: TextSegment[][] = [];
+  let currentLine = "";
+  let currentLineStart = 0;
+  let charPos = 0;
+  
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = font.widthOfTextAtSize(testLine.replace(/\*\*/g, ''), fontSize);
+    
+    if (testWidth <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) {
+        // Convert currentLine to segments
+        lines.push(lineToSegments(currentLine, currentLineStart, isBold));
+        currentLineStart = charPos;
+      }
+      currentLine = word;
+    }
+    charPos += word.length + (i < words.length - 1 ? 1 : 0);
+  }
+  if (currentLine) {
+    lines.push(lineToSegments(currentLine, currentLineStart, isBold));
+  }
+  
+  return lines;
+}
+
+// Convert a line to segments based on bold positions
+function lineToSegments(line: string, startPos: number, isBold: (pos: number) => boolean): TextSegment[] {
+  const segments: TextSegment[] = [];
+  let currentText = "";
+  let currentBold = isBold(startPos);
+  
+  for (let i = 0; i < line.length; i++) {
+    const charBold = isBold(startPos + i);
+    if (charBold !== currentBold) {
+      if (currentText) {
+        segments.push({ text: currentText, bold: currentBold });
+      }
+      currentText = line[i];
+      currentBold = charBold;
+    } else {
+      currentText += line[i];
+    }
+  }
+  if (currentText) {
+    segments.push({ text: currentText, bold: currentBold });
+  }
+  return segments;
 }
 
 // Calculate how many lines a section needs
@@ -118,8 +242,9 @@ function findOptimalFontSize(
     const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
     let totalHeight = titleLines.length * titleLineHeight + 3; // title + separator space
     
-    // Složení section
-    const slozeniLines = wrapTextWithFont("Složení: " + label.slozeni, contentWidth, size, font);
+    // Složení section (use plain text for height calc, bold doesn't change line count much)
+    const slozeniPlain = "Složení: " + label.slozeni.replace(/\*\*/g, '');
+    const slozeniLines = wrapTextWithFont(slozeniPlain, contentWidth, size, font);
     totalHeight += slozeniLines.length * lineHeight + 1;
     
     // Nutriční hodnoty section
@@ -204,42 +329,81 @@ function drawLabel(
   });
   currentY -= 2;
   
-  // === SLOŽENÍ ===
+  // === SLOŽENÍ (with bold support) ===
   const slozeniText = "Složení: " + label.slozeni;
-  const slozeniLines = wrapTextWithFont(slozeniText, maxTextWidth, fontSize, font);
+  const slozeniSegmentLines = wrapTextWithBold(slozeniText, maxTextWidth, fontSize, font, fontBold);
   
-  for (let i = 0; i < slozeniLines.length; i++) {
+  for (let i = 0; i < slozeniSegmentLines.length; i++) {
     currentY -= lineHeight;
-    const line = slozeniLines[i];
+    let drawX = textX;
+    const segments = slozeniSegmentLines[i];
     
-    if (i === 0) {
-      // First line: "Složení:" in bold, rest in regular
-      const prefixWidth = fontBold.widthOfTextAtSize("Složení: ", fontSize);
-      page.drawText("Složení:", {
-        x: textX,
-        y: currentY,
-        size: fontSize,
-        font: fontBold,
-        color: rgb(0, 0, 0),
-      });
-      const restText = line.substring("Složení: ".length);
-      if (restText) {
-        page.drawText(restText, {
-          x: textX + prefixWidth,
+    // First line: make "Složení:" bold regardless
+    if (i === 0 && segments.length > 0) {
+      const firstSegText = segments[0].text;
+      if (firstSegText.startsWith("Složení:")) {
+        // Draw "Složení:" in bold
+        page.drawText("Složení:", {
+          x: drawX,
           y: currentY,
           size: fontSize,
-          font,
+          font: fontBold,
           color: rgb(0, 0, 0),
         });
+        drawX += fontBold.widthOfTextAtSize("Složení:", fontSize);
+        // Draw rest of first segment
+        const restOfFirst = firstSegText.substring("Složení:".length);
+        if (restOfFirst) {
+          const restFont = segments[0].bold ? fontBold : font;
+          page.drawText(restOfFirst, {
+            x: drawX,
+            y: currentY,
+            size: fontSize,
+            font: restFont,
+            color: rgb(0, 0, 0),
+          });
+          drawX += restFont.widthOfTextAtSize(restOfFirst, fontSize);
+        }
+        // Draw remaining segments
+        for (let j = 1; j < segments.length; j++) {
+          const seg = segments[j];
+          const segFont = seg.bold ? fontBold : font;
+          page.drawText(seg.text, {
+            x: drawX,
+            y: currentY,
+            size: fontSize,
+            font: segFont,
+            color: rgb(0, 0, 0),
+          });
+          drawX += segFont.widthOfTextAtSize(seg.text, fontSize);
+        }
+      } else {
+        // Normal segment drawing
+        for (const seg of segments) {
+          const segFont = seg.bold ? fontBold : font;
+          page.drawText(seg.text, {
+            x: drawX,
+            y: currentY,
+            size: fontSize,
+            font: segFont,
+            color: rgb(0, 0, 0),
+          });
+          drawX += segFont.widthOfTextAtSize(seg.text, fontSize);
+        }
       }
     } else {
-      page.drawText(line, {
-        x: textX,
-        y: currentY,
-        size: fontSize,
-        font,
-        color: rgb(0, 0, 0),
-      });
+      // Other lines: draw segments with bold support
+      for (const seg of segments) {
+        const segFont = seg.bold ? fontBold : font;
+        page.drawText(seg.text, {
+          x: drawX,
+          y: currentY,
+          size: fontSize,
+          font: segFont,
+          color: rgb(0, 0, 0),
+        });
+        drawX += segFont.widthOfTextAtSize(seg.text, fontSize);
+      }
     }
   }
   currentY -= 2;
