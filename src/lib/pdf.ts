@@ -271,8 +271,10 @@ function findOptimalFontSize(
     const slozeniLines = wrapTextWithFont(slozeniPlain, contentWidth, size, font);
     totalHeight += slozeniLines.length * lineHeight + 1;
     
-    // Nutriční hodnoty section (header line + content)
-    totalHeight += lineHeight; // header line "Nutriční hodnoty:"
+    // Nutriční hodnoty section (header may wrap to 2 lines + content)
+    const nutriHeaderTest = "Nutriční hodnoty (100g):";
+    const nutriHeaderWidth = fontBold.widthOfTextAtSize(nutriHeaderTest, size);
+    totalHeight += nutriHeaderWidth <= contentWidth ? lineHeight : lineHeight * 2; // header
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
     totalHeight += nutriLines.length * lineHeight + 1;
     
@@ -433,14 +435,38 @@ function drawLabel(
   currentY -= 2;
   
   // === NUTRIČNÍ HODNOTY ===
-  currentY -= lineHeight;
-  page.drawText("Nutriční hodnoty:", {
-    x: textX,
-    y: currentY,
-    size: fontSize,
-    font: fontBold,
-    color: rgb(0, 0, 0),
-  });
+  const nutriHeader = "Nutriční hodnoty (100g):";
+  const nutriHeaderWidth = fontBold.widthOfTextAtSize(nutriHeader, fontSize);
+  
+  if (nutriHeaderWidth <= maxTextWidth) {
+    // Fits on one line
+    currentY -= lineHeight;
+    page.drawText(nutriHeader, {
+      x: textX,
+      y: currentY,
+      size: fontSize,
+      font: fontBold,
+      color: rgb(0, 0, 0),
+    });
+  } else {
+    // Wrap to two lines
+    currentY -= lineHeight;
+    page.drawText("Nutriční hodnoty", {
+      x: textX,
+      y: currentY,
+      size: fontSize,
+      font: fontBold,
+      color: rgb(0, 0, 0),
+    });
+    currentY -= lineHeight;
+    page.drawText("(100g):", {
+      x: textX,
+      y: currentY,
+      size: fontSize,
+      font: fontBold,
+      color: rgb(0, 0, 0),
+    });
+  }
   
   const nutriLines = wrapTextWithFont(label.nutricniHodnoty, maxTextWidth, fontSize, font);
   for (const line of nutriLines) {
