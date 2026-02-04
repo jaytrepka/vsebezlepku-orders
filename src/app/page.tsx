@@ -53,11 +53,11 @@ export default function Home() {
   const [fetchingProductInfo, setFetchingProductInfo] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Calculate total items to print (from selected orders, excluding unchecked items)
+  // Calculate total items to print (from selected orders, excluding unchecked items and items without labels)
   const itemsToPrint = orders
     .filter((o) => selectedOrders.includes(o.id))
     .flatMap((o) => o.items)
-    .filter((item) => !excludedItems.includes(item.id))
+    .filter((item) => !excludedItems.includes(item.id) && item.label)
     .reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {

@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Skip items without labels (instead of error)
         if (!item.label) {
-          missingLabels.push(item.productName);
           continue;
         }
 
@@ -52,16 +52,6 @@ export async function POST(request: NextRequest) {
           quantity: item.quantity,
         });
       }
-    }
-
-    if (missingLabels.length > 0) {
-      return NextResponse.json(
-        {
-          error: "Missing labels for products",
-          missingLabels: [...new Set(missingLabels)],
-        },
-        { status: 400 }
-      );
     }
 
     if (labelRequests.length === 0) {
