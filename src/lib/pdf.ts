@@ -1,12 +1,9 @@
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, rgb, PDFFont, PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
 // Load fonts via HTTP - works on Vercel serverless
 async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }> {
-  // Use the production URL directly
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vsebezlepku-orders.vercel.app';
-  
-  console.log("Loading fonts from:", baseUrl);
   
   const [regularRes, boldRes] = await Promise.all([
     fetch(`${baseUrl}/fonts/NotoSans-Regular.ttf`),
@@ -23,21 +20,18 @@ async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }>
   };
 }
 
-// A4 dimensions in points (1 point = 1/72 inch) - LANDSCAPE
-const A4_WIDTH = 841.89;  // 297mm
-const A4_HEIGHT = 595.28; // 210mm
+// A4 dimensions in points - LANDSCAPE
+const A4_WIDTH = 841.89;
+const A4_HEIGHT = 595.28;
 
-// Label dimensions in mm -> points (1mm = 2.83465 points)
-// Labels are 36mm wide x 70mm tall
+// Label dimensions: 36mm x 70mm
 const MM_TO_PT = 2.83465;
-const LABEL_WIDTH = 36 * MM_TO_PT;  // ~102 points
-const LABEL_HEIGHT = 70 * MM_TO_PT; // ~198 points
+const LABEL_WIDTH = 36 * MM_TO_PT;
+const LABEL_HEIGHT = 70 * MM_TO_PT;
 
-// Grid: 8 columns x 3 rows = 24 labels on landscape A4
+// Grid: 8 columns x 3 rows = 24 labels
 const COLS = 8;
 const ROWS = 3;
-
-// Margins to center the grid on page
 const MARGIN_X = (A4_WIDTH - COLS * LABEL_WIDTH) / 2;
 const MARGIN_Y = (A4_HEIGHT - ROWS * LABEL_HEIGHT) / 2;
 
@@ -54,19 +48,21 @@ export interface LabelRequest {
   quantity: number;
 }
 
-function wrapText(text: string, maxWidth: number, fontSize: number, charWidth: number): string[] {
-  const avgCharWidth = charWidth * fontSize;
-  const maxChars = Math.floor(maxWidth / avgCharWidth);
-  const words = text.split(" ");
+// Wrap text using actual font measurements
+function wrapTextWithFont(text: string, maxWidth: number, fontSize: number, font: PDFFont): string[] {
+  const words = text.split(/\s+/);
   const lines: string[] = [];
   let currentLine = "";
 
   for (const word of words) {
     const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (testLine.length <= maxChars) {
+    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+    
+    if (testWidth <= maxWidth) {
       currentLine = testLine;
     } else {
       if (currentLine) lines.push(currentLine);
+      // If single word is too long, just add it anyway
       currentLine = word;
     }
   }
@@ -75,16 +71,290 @@ function wrapText(text: string, maxWidth: number, fontSize: number, charWidth: n
   return lines;
 }
 
+// Calculate how many lines a section needs
+function calculateSectionLines(
+  prefix: string,
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  font: PDFFont,
+  fontBold: PDFFont
+): number {
+  const prefixWidth = fontBold.widthOfTextAtSize(prefix, fontSize);
+  const firstLineWidth = maxWidth - prefixWidth - 2;
+  
+  // First line has prefix, so less space
+  const allLines = wrapTextWithFont(text, maxWidth, fontSize, font);
+  if (allLines.length === 0) return 1;
+  
+  // Check if first line fits after prefix
+  const firstLineText = allLines[0];
+  const firstLineActualWidth = font.widthOfTextAtSize(firstLineText, fontSize);
+  
+  if (firstLineActualWidth <= firstLineWidth) {
+    return allLines.length;
+  } else {
+    // First line needs to wrap more
+    return wrapTextWithFont(text, maxWidth, fontSize, font).length + 1;
+  }
+}
+
+// Find optimal font size that fits all content
+function findOptimalFontSize(
+  label: LabelData,
+  contentWidth: number,
+  availableHeight: number,
+  font: PDFFont,
+  fontBold: PDFFont
+): number {
+  const minSize = 3;
+  const maxSize = 7;
+  
+  for (let size = maxSize; size >= minSize; size -= 0.5) {
+    const lineHeight = size * 1.3;
+    const titleLineHeight = (size + 1) * 1.3;
+    
+    // Calculate title lines
+    const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
+    let totalHeight = titleLines.length * titleLineHeight + 4; // title + separator space
+    
+    // Složení section
+    const slozeniLines = wrapTextWithFont("Složení: " + label.slozeni, contentWidth, size, font);
+    totalHeight += slozeniLines.length * lineHeight + 2;
+    
+    // Nutriční hodnoty section
+    const nutriHeader = "Nutriční hodnoty (100g):";
+    totalHeight += lineHeight; // header
+    const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
+    totalHeight += nutriLines.length * lineHeight + 2;
+    
+    // Skladování (optional)
+    if (label.skladovani) {
+      const skladLines = wrapTextWithFont("Skladování: " + label.skladovani, contentWidth, size, font);
+      totalHeight += skladLines.length * lineHeight + 2;
+    }
+    
+    // Výrobce
+    const vyrobceLines = wrapTextWithFont("Výrobce: " + label.vyrobce, contentWidth, size, font);
+    totalHeight += vyrobceLines.length * lineHeight;
+    
+    if (totalHeight <= availableHeight) {
+      return size;
+    }
+  }
+  
+  return minSize;
+}
+
+// Draw a single label
+function drawLabel(
+  page: PDFPage,
+  label: LabelData,
+  x: number,
+  y: number,
+  font: PDFFont,
+  fontBold: PDFFont
+) {
+  const padding = 3;
+  const contentWidth = LABEL_WIDTH - 2 * padding;
+  const contentHeight = LABEL_HEIGHT - 2 * padding;
+  const borderColor = rgb(0, 0, 0);
+  
+  // Draw border
+  page.drawRectangle({
+    x: x + padding,
+    y: y + padding,
+    width: LABEL_WIDTH - 2 * padding,
+    height: LABEL_HEIGHT - 2 * padding,
+    borderColor,
+    borderWidth: 0.5,
+    color: rgb(1, 1, 1),
+  });
+  
+  // Find optimal font size
+  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 4, font, fontBold);
+  const lineHeight = fontSize * 1.3;
+  const titleSize = fontSize + 1;
+  const titleLineHeight = titleSize * 1.3;
+  
+  let currentY = y + LABEL_HEIGHT - padding - 2;
+  const textX = x + padding + 2;
+  const maxTextWidth = contentWidth - 4;
+  
+  // === NÁZEV (title, bold, centered) ===
+  const titleLines = wrapTextWithFont(label.nazev, maxTextWidth, titleSize, fontBold);
+  for (const line of titleLines) {
+    currentY -= titleLineHeight;
+    const lineWidth = fontBold.widthOfTextAtSize(line, titleSize);
+    page.drawText(line, {
+      x: x + (LABEL_WIDTH - lineWidth) / 2,
+      y: currentY,
+      size: titleSize,
+      font: fontBold,
+      color: rgb(0, 0, 0),
+    });
+  }
+  
+  // Separator line after title
+  currentY -= 2;
+  page.drawLine({
+    start: { x: x + padding, y: currentY },
+    end: { x: x + LABEL_WIDTH - padding, y: currentY },
+    color: borderColor,
+    thickness: 0.3,
+  });
+  currentY -= 2;
+  
+  // === SLOŽENÍ ===
+  const slozeniText = "Složení: " + label.slozeni;
+  const slozeniLines = wrapTextWithFont(slozeniText, maxTextWidth, fontSize, font);
+  
+  for (let i = 0; i < slozeniLines.length; i++) {
+    currentY -= lineHeight;
+    const line = slozeniLines[i];
+    
+    if (i === 0) {
+      // First line: "Složení:" in bold, rest in regular
+      const prefixWidth = fontBold.widthOfTextAtSize("Složení: ", fontSize);
+      page.drawText("Složení:", {
+        x: textX,
+        y: currentY,
+        size: fontSize,
+        font: fontBold,
+        color: rgb(0, 0, 0),
+      });
+      const restText = line.substring("Složení: ".length);
+      if (restText) {
+        page.drawText(restText, {
+          x: textX + prefixWidth,
+          y: currentY,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+    } else {
+      page.drawText(line, {
+        x: textX,
+        y: currentY,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+  }
+  currentY -= 2;
+  
+  // === NUTRIČNÍ HODNOTY ===
+  currentY -= lineHeight;
+  page.drawText("Nutriční hodnoty (100g):", {
+    x: textX,
+    y: currentY,
+    size: fontSize,
+    font: fontBold,
+    color: rgb(0, 0, 0),
+  });
+  
+  const nutriLines = wrapTextWithFont(label.nutricniHodnoty, maxTextWidth, fontSize, font);
+  for (const line of nutriLines) {
+    currentY -= lineHeight;
+    page.drawText(line, {
+      x: textX,
+      y: currentY,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  }
+  currentY -= 2;
+  
+  // === SKLADOVÁNÍ (optional) ===
+  if (label.skladovani) {
+    const skladText = "Skladování: " + label.skladovani;
+    const skladLines = wrapTextWithFont(skladText, maxTextWidth, fontSize, font);
+    
+    for (let i = 0; i < skladLines.length; i++) {
+      currentY -= lineHeight;
+      const line = skladLines[i];
+      
+      if (i === 0) {
+        const prefixWidth = fontBold.widthOfTextAtSize("Skladování: ", fontSize);
+        page.drawText("Skladování:", {
+          x: textX,
+          y: currentY,
+          size: fontSize,
+          font: fontBold,
+          color: rgb(0, 0, 0),
+        });
+        const restText = line.substring("Skladování: ".length);
+        if (restText) {
+          page.drawText(restText, {
+            x: textX + prefixWidth,
+            y: currentY,
+            size: fontSize,
+            font,
+            color: rgb(0, 0, 0),
+          });
+        }
+      } else {
+        page.drawText(line, {
+          x: textX,
+          y: currentY,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+    }
+    currentY -= 2;
+  }
+  
+  // === VÝROBCE ===
+  const vyrobceText = "Výrobce: " + label.vyrobce;
+  const vyrobceLines = wrapTextWithFont(vyrobceText, maxTextWidth, fontSize, font);
+  
+  for (let i = 0; i < vyrobceLines.length; i++) {
+    currentY -= lineHeight;
+    const line = vyrobceLines[i];
+    
+    if (i === 0) {
+      const prefixWidth = fontBold.widthOfTextAtSize("Výrobce: ", fontSize);
+      page.drawText("Výrobce:", {
+        x: textX,
+        y: currentY,
+        size: fontSize,
+        font: fontBold,
+        color: rgb(0, 0, 0),
+      });
+      const restText = line.substring("Výrobce: ".length);
+      if (restText) {
+        page.drawText(restText, {
+          x: textX + prefixWidth,
+          y: currentY,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+    } else {
+      page.drawText(line, {
+        x: textX,
+        y: currentY,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+  }
+}
+
 export async function generateLabelsPDF(
   labels: LabelRequest[],
   startPosition: number = 1
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
-  
-  // Register fontkit for custom font support
   pdfDoc.registerFontkit(fontkit);
   
-  // Load custom fonts via HTTP (works on Vercel serverless)
   const fonts = await loadFonts();
   const font = await pdfDoc.embedFont(fonts.regular);
   const fontBold = await pdfDoc.embedFont(fonts.bold);
@@ -97,236 +367,30 @@ export async function generateLabelsPDF(
     }
   }
 
-  // Calculate total positions needed
   const totalLabels = allLabels.length;
-  const startIndex = startPosition - 1; // Convert to 0-based
+  const startIndex = startPosition - 1;
   const totalPositions = startIndex + totalLabels;
   const totalPages = Math.ceil(totalPositions / (COLS * ROWS));
 
   let labelIndex = 0;
 
-  console.log("PDF Generation: totalLabels =", totalLabels, ", startIndex =", startIndex, ", totalPages =", totalPages);
-  console.log("Grid:", COLS, "x", ROWS, "= 24 labels");
-  console.log("Margins:", MARGIN_X.toFixed(2), "x", MARGIN_Y.toFixed(2));
-  console.log("Label dimensions:", LABEL_WIDTH.toFixed(2), "x", LABEL_HEIGHT.toFixed(2));
-
   for (let pageNum = 0; pageNum < totalPages; pageNum++) {
     const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
-    console.log("Added page", pageNum + 1, "size:", A4_WIDTH, "x", A4_HEIGHT);
-    
-    // DEBUG: Draw a test marker at top-left corner to verify PDF is rendering
-    page.drawRectangle({
-      x: 10,
-      y: A4_HEIGHT - 30,
-      width: 100,
-      height: 20,
-      color: rgb(1, 0, 0),
-    });
-    page.drawText("DEBUG TEST", {
-      x: 15,
-      y: A4_HEIGHT - 25,
-      size: 10,
-      font: fontBold,
-      color: rgb(1, 1, 1),
-    });
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
         const position = pageNum * (COLS * ROWS) + row * COLS + col;
 
-        // Skip positions before startPosition
         if (position < startIndex) continue;
-
-        // Check if we have labels left
         if (labelIndex >= allLabels.length) continue;
 
         const label = allLabels[labelIndex];
         labelIndex++;
 
-        // Calculate label position (top-left corner, Y from bottom in PDF)
         const x = MARGIN_X + col * LABEL_WIDTH;
         const y = A4_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
-        console.log(`Drawing label at position ${position}: row=${row}, col=${col}, x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
 
-        const padding = 2;
-        const innerPadding = 3;
-        const contentWidth = LABEL_WIDTH - 2 * padding;
-        const borderColor = rgb(0, 0, 0);
-        const lineWidth = 0.5;
-
-        // Draw outer border with light fill to make it visible
-        page.drawRectangle({
-          x: x + padding,
-          y: y + padding,
-          width: LABEL_WIDTH - 2 * padding,
-          height: LABEL_HEIGHT - 2 * padding,
-          borderColor,
-          borderWidth: lineWidth,
-          color: rgb(1, 1, 1), // White fill
-        });
-
-        let currentY = y + LABEL_HEIGHT - padding;
-
-        // === NAZEV section (product name box at top) ===
-        const nazevHeight = 16;
-        page.drawLine({
-          start: { x: x + padding, y: currentY - nazevHeight },
-          end: { x: x + LABEL_WIDTH - padding, y: currentY - nazevHeight },
-          color: borderColor,
-          thickness: lineWidth,
-        });
-
-        // Product name - bold, centered, wrapped if needed
-        const nazevSize = 6;
-        const nazevLines = wrapText(label.nazev, contentWidth - 4, nazevSize, 0.55);
-        const nazevLineHeight = nazevSize + 1;
-        const nazevTotalHeight = nazevLines.length * nazevLineHeight;
-        let nazevY = currentY - (nazevHeight - nazevTotalHeight) / 2 - nazevSize;
-        
-        for (const line of nazevLines.slice(0, 2)) {
-          const lineWidthPx = fontBold.widthOfTextAtSize(line, nazevSize);
-          page.drawText(line, {
-            x: x + (LABEL_WIDTH - lineWidthPx) / 2,
-            y: nazevY,
-            size: nazevSize,
-            font: fontBold,
-            color: rgb(0, 0, 0),
-          });
-          nazevY -= nazevLineHeight;
-        }
-        currentY -= nazevHeight;
-
-        // Calculate remaining height for content sections
-        const nutriHeight = 45;
-        const vyrobceHeight = label.skladovani ? 20 : 14;
-        const slozeniHeight = LABEL_HEIGHT - 2 * padding - nazevHeight - nutriHeight - vyrobceHeight;
-
-        // === SLOZENI section ===
-        page.drawLine({
-          start: { x: x + padding, y: currentY - slozeniHeight },
-          end: { x: x + LABEL_WIDTH - padding, y: currentY - slozeniHeight },
-          color: borderColor,
-          thickness: lineWidth,
-        });
-
-        const textSize = 4.5;
-        const lineHeight = textSize + 1;
-        let textY = currentY - innerPadding - textSize;
-        const textX = x + padding + innerPadding;
-        const textWidth = contentWidth - 2 * innerPadding;
-
-        page.drawText("Složení:", {
-          x: textX,
-          y: textY,
-          size: textSize,
-          font: fontBold,
-          color: rgb(0, 0, 0),
-        });
-        
-        const slozeniText = label.slozeni;
-        const slozeniLines = wrapText(slozeniText, textWidth, textSize, 0.45);
-        
-        const slozeniPrefix = "Složení: ";
-        const prefixWidth = fontBold.widthOfTextAtSize(slozeniPrefix, textSize);
-        
-        if (slozeniLines.length > 0) {
-          const firstLineRemainder = wrapText(slozeniLines[0], textWidth - prefixWidth / 0.45 / textSize, textSize, 0.45);
-          page.drawText(firstLineRemainder[0] || slozeniLines[0], {
-            x: textX + prefixWidth,
-            y: textY,
-            size: textSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-        }
-        textY -= lineHeight;
-
-        const maxSlozeniLines = Math.floor((slozeniHeight - innerPadding * 2) / lineHeight) - 1;
-        for (let i = 1; i < Math.min(slozeniLines.length, maxSlozeniLines); i++) {
-          page.drawText(slozeniLines[i], {
-            x: textX,
-            y: textY,
-            size: textSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-          textY -= lineHeight;
-        }
-        currentY -= slozeniHeight;
-
-        // === NUTRICNI HODNOTY section ===
-        page.drawLine({
-          start: { x: x + padding, y: currentY - nutriHeight },
-          end: { x: x + LABEL_WIDTH - padding, y: currentY - nutriHeight },
-          color: borderColor,
-          thickness: lineWidth,
-        });
-
-        textY = currentY - innerPadding - textSize;
-        page.drawText("Nutriční hodnoty (na 100g):", {
-          x: textX,
-          y: textY,
-          size: textSize,
-          font: fontBold,
-          color: rgb(0, 0, 0),
-        });
-        textY -= lineHeight;
-
-        const nutriLines = wrapText(label.nutricniHodnoty, textWidth, textSize, 0.45);
-        for (let i = 0; i < Math.min(nutriLines.length, 6); i++) {
-          page.drawText(nutriLines[i], {
-            x: textX,
-            y: textY,
-            size: textSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-          textY -= lineHeight;
-        }
-        currentY -= nutriHeight;
-
-        // === VYROBCE section (bottom box, with optional skladovani) ===
-        textY = currentY - innerPadding - textSize;
-        
-        // Skladovani (if present)
-        if (label.skladovani) {
-          page.drawText("Skladování:", {
-            x: textX,
-            y: textY,
-            size: textSize,
-            font: fontBold,
-            color: rgb(0, 0, 0),
-          });
-          const skladPrefix = "Skladování: ";
-          const skladPrefixWidth = fontBold.widthOfTextAtSize(skladPrefix, textSize);
-          page.drawText(label.skladovani, {
-            x: textX + skladPrefixWidth,
-            y: textY,
-            size: textSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-          textY -= lineHeight;
-        }
-        
-        // Vyrobce
-        page.drawText("Výrobce:", {
-          x: textX,
-          y: textY,
-          size: textSize,
-          font: fontBold,
-          color: rgb(0, 0, 0),
-        });
-        
-        const vyrobcePrefix = "Výrobce: ";
-        const vyrobcePrefixWidth = fontBold.widthOfTextAtSize(vyrobcePrefix, textSize);
-        page.drawText(label.vyrobce, {
-          x: textX + vyrobcePrefixWidth,
-          y: textY,
-          size: textSize,
-          font,
-          color: rgb(0, 0, 0),
-        });
+        drawLabel(page, label, x, y, font, fontBold);
       }
     }
   }
