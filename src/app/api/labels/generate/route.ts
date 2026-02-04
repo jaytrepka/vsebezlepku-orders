@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const { orderIds, startPosition = 1 } = await request.json();
+    const { orderIds, startPosition = 1, excludedItemIds = [] } = await request.json();
 
     if (!orderIds || !Array.isArray(orderIds)) {
       return NextResponse.json(
@@ -31,6 +31,11 @@ export async function POST(request: NextRequest) {
 
     for (const order of orders) {
       for (const item of order.items) {
+        // Skip excluded items
+        if (excludedItemIds.includes(item.id)) {
+          continue;
+        }
+
         if (!item.label) {
           missingLabels.push(item.productName);
           continue;

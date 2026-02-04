@@ -32,6 +32,7 @@ interface Order {
 export default function Home() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [excludedItems, setExcludedItems] = useState<string[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [daysBack, setDaysBack] = useState(30);
@@ -51,6 +52,13 @@ export default function Home() {
   });
   const [fetchingProductInfo, setFetchingProductInfo] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Calculate total items to print (from selected orders, excluding unchecked items)
+  const itemsToPrint = orders
+    .filter((o) => selectedOrders.includes(o.id))
+    .flatMap((o) => o.items)
+    .filter((item) => !excludedItems.includes(item.id))
+    .reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     checkAuth();
@@ -115,12 +123,17 @@ export default function Home() {
       return;
     }
 
+    if (itemsToPrint === 0) {
+      setMessage({ type: "error", text: "Žádné položky k tisku - všechny jsou odškrtnuté" });
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/labels/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderIds: selectedOrders, startPosition }),
+        body: JSON.stringify({ orderIds: selectedOrders, startPosition, excludedItemIds: excludedItems }),
       });
 
       if (!res.ok) {
@@ -174,10 +187,26 @@ export default function Home() {
   }
 
   function toggleOrder(orderId: string) {
-    setSelectedOrders((prev) =>
-      prev.includes(orderId)
-        ? prev.filter((id) => id !== orderId)
-        : [...prev, orderId]
+    setSelectedOrders((prev) => {
+      if (prev.includes(orderId)) {
+        return prev.filter((id) => id !== orderId);
+      } else {
+        // When selecting order, ensure all its items are included (not excluded)
+        const order = orders.find((o) => o.id === orderId);
+        if (order) {
+          const itemIds = order.items.map((i) => i.id);
+          setExcludedItems((ex) => ex.filter((id) => !itemIds.includes(id)));
+        }
+        return [...prev, orderId];
+      }
+    });
+  }
+
+  function toggleItem(itemId: string) {
+    setExcludedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
     );
   }
 
@@ -317,11 +346,11 @@ export default function Home() {
 
           <button
             onClick={generateLabels}
-            disabled={selectedOrders.length === 0 || loading}
+            disabled={selectedOrders.length === 0 || itemsToPrint === 0 || loading}
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
-            Generovat štítky ({selectedOrders.length})
+            Generovat štítky ({itemsToPrint} ks)
           </button>
 
           {selectedOrders.length > 0 && (
@@ -391,8 +420,19 @@ export default function Home() {
                       {order.items.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center gap-2 text-sm"
+                          className={`flex items-center gap-2 text-sm ${
+                            excludedItems.includes(item.id) ? "opacity-50" : ""
+                          }`}
                         >
+                          {selectedOrders.includes(order.id) && (
+                            <input
+                              type="checkbox"
+                              checked={!excludedItems.includes(item.id)}
+                              onChange={() => toggleItem(item.id)}
+                              className="rounded w-4 h-4"
+                              title="Zahrnout do tisku"
+                            />
+                          )}
                           <span className="font-medium">{item.quantity}×</span>
                           <span className="truncate max-w-xs">
                             {item.productName}
