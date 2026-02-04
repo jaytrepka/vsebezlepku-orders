@@ -1,7 +1,30 @@
 import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import * as fs from "fs";
-import * as path from "path";
+
+// Base64 encoded Noto Sans Regular (subset for Czech)
+// This avoids file system issues on Vercel serverless
+async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }> {
+  // In development, use local files; in production on Vercel, use fetch from public URL
+  const baseUrl = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  
+  console.log("Loading fonts from:", baseUrl);
+  
+  const [regularRes, boldRes] = await Promise.all([
+    fetch(`${baseUrl}/fonts/NotoSans-Regular.ttf`),
+    fetch(`${baseUrl}/fonts/NotoSans-Bold.ttf`),
+  ]);
+  
+  if (!regularRes.ok || !boldRes.ok) {
+    throw new Error(`Failed to load fonts: regular=${regularRes.status}, bold=${boldRes.status}`);
+  }
+  
+  return {
+    regular: await regularRes.arrayBuffer(),
+    bold: await boldRes.arrayBuffer(),
+  };
+}
 
 // A4 dimensions in points (1 point = 1/72 inch) - LANDSCAPE
 const A4_WIDTH = 841.89;  // 297mm
@@ -64,15 +87,10 @@ export async function generateLabelsPDF(
   // Register fontkit for custom font support
   pdfDoc.registerFontkit(fontkit);
   
-  // Load custom fonts that support Czech characters
-  const fontPath = path.join(process.cwd(), "public", "fonts", "NotoSans-Regular.ttf");
-  const fontBoldPath = path.join(process.cwd(), "public", "fonts", "NotoSans-Bold.ttf");
-  
-  const fontBytes = fs.readFileSync(fontPath);
-  const fontBoldBytes = fs.readFileSync(fontBoldPath);
-  
-  const font = await pdfDoc.embedFont(fontBytes);
-  const fontBold = await pdfDoc.embedFont(fontBoldBytes);
+  // Load custom fonts via HTTP (works on Vercel serverless)
+  const fonts = await loadFonts();
+  const font = await pdfDoc.embedFont(fonts.regular);
+  const fontBold = await pdfDoc.embedFont(fonts.bold);
 
   // Flatten labels by quantity
   const allLabels: LabelData[] = [];
