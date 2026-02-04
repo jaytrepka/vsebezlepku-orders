@@ -108,7 +108,7 @@ function findOptimalFontSize(
   fontBold: PDFFont
 ): number {
   const minSize = 3;
-  const maxSize = 7;
+  const maxSize = 9;
   
   for (let size = maxSize; size >= minSize; size -= 0.5) {
     const lineHeight = size * 1.3;
