@@ -128,10 +128,10 @@ function findOptimalFontSize(
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
     totalHeight += nutriLines.length * lineHeight + 2;
     
-    // Skladování (optional)
+    // Info (optional) - no prefix
     if (label.skladovani) {
-      const skladLines = wrapTextWithFont("Skladování: " + label.skladovani, contentWidth, size, font);
-      totalHeight += skladLines.length * lineHeight + 2;
+      const infoLines = wrapTextWithFont(label.skladovani, contentWidth, size, font);
+      totalHeight += infoLines.length * lineHeight + 2;
     }
     
     // Výrobce
@@ -268,43 +268,19 @@ function drawLabel(
   }
   currentY -= 2;
   
-  // === SKLADOVÁNÍ (optional) ===
+  // === INFO (optional, no prefix - raw text) ===
   if (label.skladovani) {
-    const skladText = "Skladování: " + label.skladovani;
-    const skladLines = wrapTextWithFont(skladText, maxTextWidth, fontSize, font);
+    const infoLines = wrapTextWithFont(label.skladovani, maxTextWidth, fontSize, font);
     
-    for (let i = 0; i < skladLines.length; i++) {
+    for (const line of infoLines) {
       currentY -= lineHeight;
-      const line = skladLines[i];
-      
-      if (i === 0) {
-        const prefixWidth = fontBold.widthOfTextAtSize("Skladování: ", fontSize);
-        page.drawText("Skladování:", {
-          x: textX,
-          y: currentY,
-          size: fontSize,
-          font: fontBold,
-          color: rgb(0, 0, 0),
-        });
-        const restText = line.substring("Skladování: ".length);
-        if (restText) {
-          page.drawText(restText, {
-            x: textX + prefixWidth,
-            y: currentY,
-            size: fontSize,
-            font,
-            color: rgb(0, 0, 0),
-          });
-        }
-      } else {
-        page.drawText(line, {
-          x: textX,
-          y: currentY,
-          size: fontSize,
-          font,
-          color: rgb(0, 0, 0),
-        });
-      }
+      page.drawText(line, {
+        x: textX,
+        y: currentY,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
     }
     currentY -= 2;
   }
