@@ -170,8 +170,8 @@ function drawLabel(
     color: rgb(1, 1, 1),
   });
   
-  // Find optimal font size
-  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 4, font, fontBold);
+  // Find optimal font size (subtract extra padding for bottom margin)
+  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 8, font, fontBold);
   const lineHeight = fontSize * 1.15;
   const titleSize = fontSize + 1;
   const titleLineHeight = titleSize * 1.15;
