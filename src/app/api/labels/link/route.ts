@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       cleanName = cleanName.replace(/^\d+ [\d,.]+ Kč\s*/i, "");
       
       // Try to find a matching label
+      // First try exact match
       for (const label of labels) {
-        // Check if the label's productName is contained in the item's name
         if (cleanName.toLowerCase().includes(label.productName.toLowerCase()) ||
             item.productName.toLowerCase().includes(label.productName.toLowerCase())) {
           await prisma.orderItem.update({
@@ -47,6 +47,33 @@ export async function POST(request: NextRequest) {
             labelName: label.productName,
           });
           break;
+        }
+      }
+      
+      // If no match, try word-based matching
+      if (!results.matches.find(m => m.itemName === item.productName.substring(0, 60))) {
+        const itemWords = cleanName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        
+        for (const label of labels) {
+          const labelWords = label.productName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          // Check if at least 2 significant words match
+          const matchingWords = labelWords.filter(lw => 
+            itemWords.some(iw => iw.includes(lw) || lw.includes(iw))
+          );
+          
+          if (matchingWords.length >= 2 || 
+              (labelWords.length === 1 && matchingWords.length === 1)) {
+            await prisma.orderItem.update({
+              where: { id: item.id },
+              data: { labelId: label.id },
+            });
+            results.linked++;
+            results.matches.push({
+              itemName: item.productName.substring(0, 60),
+              labelName: label.productName,
+            });
+            break;
+          }
         }
       }
     }
