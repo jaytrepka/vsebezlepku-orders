@@ -272,8 +272,7 @@ function findOptimalFontSize(
     totalHeight += slozeniLines.length * lineHeight + 1;
     
     // Nutriční hodnoty section (header line + content)
-    const nutriHeader = "Nutriční hodnoty (100g):";
-    totalHeight += lineHeight; // header line
+    totalHeight += lineHeight; // header line "Nutriční hodnoty:"
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
     totalHeight += nutriLines.length * lineHeight + 1;
     
@@ -435,7 +434,7 @@ function drawLabel(
   
   // === NUTRIČNÍ HODNOTY ===
   currentY -= lineHeight;
-  page.drawText("Nutriční hodnoty (100g):", {
+  page.drawText("Nutriční hodnoty:", {
     x: textX,
     y: currentY,
     size: fontSize,
