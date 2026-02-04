@@ -96,6 +96,14 @@ export function parseOrderEmail(emailBody: string, emailDate: Date): ParsedOrder
       const quantity = parseInt(match[2], 10);
       const unitPrice = match[3].replace(',', '.') + ' Kč';
 
+      // Clean up product name - remove order number prefix and "Obsah objednávky"
+      productName = productName.replace(/^\d{9}\s+Obsah objednávky\s+/i, "");
+      productName = productName.replace(/^[A-Z0-9\-]+\s+[\d,\.]+\s*Kč\s+/i, "");
+      productName = productName.replace(/^\d+\s+[\d,\.]+\s*Kč\s+/i, "");
+      productName = productName.replace(/^\d{6,}\s+/i, "");
+      productName = productName.replace(/^Obsah objednávky\s+/i, "");
+      productName = productName.trim();
+
       if (productName && productName.length >= 10 && quantity > 0 && !/^\d+$/.test(productName)) {
         items.push({ productName, quantity, unitPrice });
       }
