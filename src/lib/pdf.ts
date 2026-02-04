@@ -115,7 +115,7 @@ export async function generateLabelsPDF(
         const borderColor = rgb(0, 0, 0);
         const lineWidth = 0.5;
 
-        // Draw outer border
+        // Draw outer border with light fill to make it visible
         page.drawRectangle({
           x: x + padding,
           y: y + padding,
@@ -123,6 +123,7 @@ export async function generateLabelsPDF(
           height: LABEL_HEIGHT - 2 * padding,
           borderColor,
           borderWidth: lineWidth,
+          color: rgb(1, 1, 1), // White fill
         });
 
         let currentY = y + LABEL_HEIGHT - padding;
@@ -175,7 +176,7 @@ export async function generateLabelsPDF(
         const textX = x + padding + innerPadding;
         const textWidth = contentWidth - 2 * innerPadding;
 
-        page.drawText("Slozeni:", {
+        page.drawText("Složení:", {
           x: textX,
           y: textY,
           size: textSize,
@@ -186,7 +187,7 @@ export async function generateLabelsPDF(
         const slozeniText = label.slozeni;
         const slozeniLines = wrapText(slozeniText, textWidth, textSize, 0.45);
         
-        const slozeniPrefix = "Slozeni: ";
+        const slozeniPrefix = "Složení: ";
         const prefixWidth = fontBold.widthOfTextAtSize(slozeniPrefix, textSize);
         
         if (slozeniLines.length > 0) {
@@ -223,7 +224,7 @@ export async function generateLabelsPDF(
         });
 
         textY = currentY - innerPadding - textSize;
-        page.drawText("Nutricni hodnoty (na 100g):", {
+        page.drawText("Nutriční hodnoty (na 100g):", {
           x: textX,
           y: textY,
           size: textSize,
@@ -250,14 +251,14 @@ export async function generateLabelsPDF(
         
         // Skladovani (if present)
         if (label.skladovani) {
-          page.drawText("Skladovani:", {
+          page.drawText("Skladování:", {
             x: textX,
             y: textY,
             size: textSize,
             font: fontBold,
             color: rgb(0, 0, 0),
           });
-          const skladPrefix = "Skladovani: ";
+          const skladPrefix = "Skladování: ";
           const skladPrefixWidth = fontBold.widthOfTextAtSize(skladPrefix, textSize);
           page.drawText(label.skladovani, {
             x: textX + skladPrefixWidth,
@@ -270,7 +271,7 @@ export async function generateLabelsPDF(
         }
         
         // Vyrobce
-        page.drawText("Vyrobce:", {
+        page.drawText("Výrobce:", {
           x: textX,
           y: textY,
           size: textSize,
@@ -278,7 +279,7 @@ export async function generateLabelsPDF(
           color: rgb(0, 0, 0),
         });
         
-        const vyrobcePrefix = "Vyrobce: ";
+        const vyrobcePrefix = "Výrobce: ";
         const vyrobcePrefixWidth = fontBold.widthOfTextAtSize(vyrobcePrefix, textSize);
         page.drawText(label.vyrobce, {
           x: textX + vyrobcePrefixWidth,
