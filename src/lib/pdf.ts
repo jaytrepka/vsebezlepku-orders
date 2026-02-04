@@ -3,18 +3,19 @@ import fontkit from "@pdf-lib/fontkit";
 import * as fs from "fs";
 import * as path from "path";
 
-// A4 dimensions in points (1 point = 1/72 inch)
-const A4_WIDTH = 595.28;
-const A4_HEIGHT = 841.89;
+// A4 dimensions in points (1 point = 1/72 inch) - LANDSCAPE
+const A4_WIDTH = 841.89;  // 297mm
+const A4_HEIGHT = 595.28; // 210mm
 
 // Label dimensions in mm -> points (1mm = 2.83465 points)
+// Labels are 36mm wide x 70mm tall
 const MM_TO_PT = 2.83465;
-const LABEL_WIDTH = 36 * MM_TO_PT; // ~102 points
+const LABEL_WIDTH = 36 * MM_TO_PT;  // ~102 points
 const LABEL_HEIGHT = 70 * MM_TO_PT; // ~198 points
 
-// Grid: 3 columns x 8 rows = 24 labels
-const COLS = 3;
-const ROWS = 8;
+// Grid: 8 columns x 3 rows = 24 labels on landscape A4
+const COLS = 8;
+const ROWS = 3;
 
 // Margins to center the grid on page
 const MARGIN_X = (A4_WIDTH - COLS * LABEL_WIDTH) / 2;
@@ -89,8 +90,13 @@ export async function generateLabelsPDF(
 
   let labelIndex = 0;
 
+  console.log("PDF Generation: totalLabels =", totalLabels, ", startIndex =", startIndex, ", totalPages =", totalPages);
+  console.log("Grid:", COLS, "x", ROWS, "= 24 labels");
+  console.log("Margins:", MARGIN_X.toFixed(2), "x", MARGIN_Y.toFixed(2));
+
   for (let pageNum = 0; pageNum < totalPages; pageNum++) {
     const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+    console.log("Added page", pageNum + 1, "size:", A4_WIDTH, "x", A4_HEIGHT);
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
@@ -108,6 +114,7 @@ export async function generateLabelsPDF(
         // Calculate label position (top-left corner, Y from bottom in PDF)
         const x = MARGIN_X + col * LABEL_WIDTH;
         const y = A4_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
+        console.log(`Drawing label at position ${position}: row=${row}, col=${col}, x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
 
         const padding = 2;
         const innerPadding = 3;

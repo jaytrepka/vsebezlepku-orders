@@ -66,7 +66,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log("Generating PDF with", labelRequests.length, "label requests, startPosition:", startPosition);
+    console.log("Label data:", JSON.stringify(labelRequests, null, 2));
+
     const pdfBytes = await generateLabelsPDF(labelRequests, startPosition);
+    console.log("PDF generated, size:", pdfBytes.length, "bytes");
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
