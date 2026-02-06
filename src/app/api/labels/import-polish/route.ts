@@ -4,46 +4,48 @@ import { prisma } from "@/lib/prisma";
 const DOC_URL = "https://docs.google.com/document/d/1WeddfeCuDqLcauAVxWjVO99iu_2t32riFLzr1gajrkE/export?format=txt";
 
 interface ParsedPolishLabel {
+  code: string;
   polishName: string;
   skladniki: string;
   wartosciOdzywcze: string;
   producent: string;
 }
 
-// Mapping of Polish product identifiers to Czech productName in database
-const productMatchers: { pattern: RegExp; czechProductName: string }[] = [
-  // Exact matches first
-  { pattern: /BROWNIES.*200\s*g/i, czechProductName: "BROWNIES 200g" },
-  { pattern: /CANTUCCI.*200\s*g/i, czechProductName: "CANTUCCI 200g" },
-  { pattern: /CZEKOLADOWE\s+SERCA\s+BATTITI.*200\s*g/i, czechProductName: "ČOKOLÁDOVÁ SRDÍČKA BATTITI 200g" },
-  { pattern: /BATONIKI\s+KOKOSOWE\s+DOGO.*120\s*g/i, czechProductName: "KOKOSOVÉ TYČINKY DOGO 120g" },
-  { pattern: /MUFFINY.*NADZIENIEM.*200\s*g/i, czechProductName: "MUFFINY S OVOCNOU NÁPLNÍ 200g" },
-  { pattern: /CIOCOMIX.*BATONIKI.*120\s*g/i, czechProductName: "CIOCOMIX TYČINKY 120g (6ks)" },
-  { pattern: /SALTERINI.*CIASTKA.*200\s*g/i, czechProductName: "SALTERINI SUŠENKY 200g" },
-  { pattern: /BEZGLUTENOWE\s+CRACKERS/i, czechProductName: "CRACKERS" },
-  { pattern: /DONUTY\s+PISTACJOWE.*90\s*g/i, czechProductName: "PISTÁCIOVÉ DONUTY 90g" },
-  { pattern: /PIACERINI\s+KARMELOWE/i, czechProductName: "PIACERINI KARAMELOVÉ SUŠENKY 81g" },
-  { pattern: /WAFLE\s+PISTACJOWE.*150\s*g/i, czechProductName: "PISTÁCIOVÉ OPLATKY 150g" },
-  { pattern: /ATTIMI.*bezglutenowe.*ciasteczka.*orzechowe.*120\s*g/i, czechProductName: "ATTIMI KŘEHKÉ LÍSKOOŘÍŠKOVÉ KOLÁČKY 120g" },
-  { pattern: /SFOGLIATINE.*polew.*morel.*150\s*g/i, czechProductName: "SFOGLIATINE KŘEHKÉ SUŠENKY S MERUŇKOVOU GLAZUROU 150g" },
-  { pattern: /RUSTYKALNY.*BEZGLUTENOWY.*CHLEB.*KROJONY.*300\s*g/i, czechProductName: "RUSTIKÁLNÍ BEZLEPKOVÝ CHLÉB KRÁJENÝ 300g" },
-  { pattern: /GRISTICK.*BARS.*60\s*g/i, czechProductName: "GRISTICK TYČINKY S PŘÍCHUTÍ BRAMBOR A ROZMARÝNU 60g" },
-  { pattern: /WRAP.*PEŁNOZIARNISTY.*180\s*g/i, czechProductName: "WRAP CELOZRNNÝ 180g (3ks)" },
-  { pattern: /GRANOLA\s+CZEKOLADOWA.*240\s*g/i, czechProductName: "GRANOLA ČOKOLÁDOVÁ 240g" },
-  { pattern: /GRANOLA\s+Z\s+CZERWONYMI.*240\s*g/i, czechProductName: "GRANOLA S ČERVENÝM OVOCEM 240g" },
-  { pattern: /DONUTY\s+BIAŁE.*90\s*g/i, czechProductName: "DONUTY BÍLÉ 90g" },
-  { pattern: /DONUTY\s+ORZECHOWE.*90\s*g/i, czechProductName: "DONUTY OŘÍŠKOVÉ 90g" },
-  { pattern: /GIRINGIRO.*ciastka.*200\s*g/i, czechProductName: "GIRINGIRO SUŠENKY 200g" },
-  { pattern: /CROSTATINE\s+ORZECHY\s+LASKOWE/i, czechProductName: "CROSTATINE LÍSKOOŘÍŠKOVÉ 200g" },
-  { pattern: /CROSTATINE\s+MORELOWE.*200\s*g/i, czechProductName: "CROSTATINE MERUŇKOVÉ 200g" },
-  { pattern: /CROSTATINE\s+Z\s+OWOCAMI\s+LEŚNYMI/i, czechProductName: "CROSTATINE S LESNÍM OVOCEM 200g" },
-  { pattern: /PASTA\s+Z\s+ORZECHÓW\s+LASKOWYCH\s+GOLOMIX.*200\s*g/i, czechProductName: "GOLOMIX KRÉM Z LÍSKOVÝCH OŘÍŠKŮ 200g" },
-  { pattern: /GOLOMIX.*Ciasteczka\s+kakaowe.*200\s*g/i, czechProductName: "GOLOMIX SUŠENKY S KAKAEM A HVĚZDIČKAMI 200g" },
-  { pattern: /PIŠKOTOWY\s+CHLEBIK.*CZEKOLAD.*270\s*g/i, czechProductName: "PIŠKOTOVÝ CHLEBÍČEK S ČOKOLÁDOU 270g" },
-  { pattern: /MĄKA\s+UNIWERSALNA.*1000\s*g/i, czechProductName: "UNIVERZÁLNÍ MOUKA 1000g" },
-  { pattern: /COUS\s*COUS.*375\s*g/i, czechProductName: "KUSKUS 375g" },
-  { pattern: /ZBOŻOWE\s+KULKI\s+MIODOWE.*300\s*g/i, czechProductName: "CEREÁLIE MEDOVÉ KROUŽKY 300g" },
-];
+// Direct mapping from Polish product names to Czech productName in database
+// Based on matching product codes, weights, or key identifiers
+const polishToCzechMap: Record<string, string> = {
+  // Polish name -> Czech productName
+  "ZBOŻOWE KULKI MIODOWE 300g": "CEREÁLIE MEDOVÉ KROUŽKY 300g",
+  "CZEKOLADOWE SERCA BATTITI 200g": "ČOKOLÁDOVÁ SRDÍČKA BATTITI 200g",
+  "BATONIKI KOKOSOWE DOGO 120 g": "KOKOSOVÉ TYČINKY DOGO 120g",
+  "CANTUCCI 200g": "CANTUCCI 200g",
+  "MUFFINY Z NADZIENIEM OWOCOWYM 200g": "MUFFINY S OVOCNOU NÁPLNÍ 200g",
+  "CIOCOMIX BATONIKI 120 g (6 szt.)": "CIOCOMIX TYČINKY 120g (6ks)",
+  "SALTERINI CIASTKA 200g": "SALTERINI SUŠENKY 200g",
+  "BEZGLUTENOWE CRACKERS": "CRACKERS",
+  "DONUTY PISTACJOWE (90g)": "PISTÁCIOVÉ DONUTY 90g",
+  "PIACERINI KARMELOWE CIASTECZKA": "PIACERINI KARAMELOVÉ SUŠENKY 81g",
+  "WAFLE PISTACJOWE 150g": "PISTÁCIOVÉ OPLATKY 150g",
+  "ATTIMI bezglutenowe ciasteczka orzechowe 120g": "ATTIMI KŘEHKÉ LÍSKOOŘÍŠKOVÉ KOLÁČKY 120g",
+  "SFOGLIATINE z polewą morelową 150g": "SFOGLIATINE KŘEHKÉ SUŠENKY S MERUŇKOVOU GLAZUROU 150g",
+  "RUSTYKALNY BEZGLUTENOWY CHLEB KROJONY (300g)": "RUSTIKÁLNÍ BEZLEPKOVÝ CHLÉB KRÁJENÝ 300g",
+  "GRISTICK BARS o smaku ziemniaków i rozmarynu 60g": "GRISTICK TYČINKY S PŘÍCHUTÍ BRAMBOR A ROZMARÝNU 60g",
+  "WRAP PEŁNOZIARNISTY 180 g (3 szt.)": "WRAP CELOZRNNÝ 180g (3ks)",
+  "GRANOLA CZEKOLADOWA 240g": "GRANOLA ČOKOLÁDOVÁ 240g",
+  "GRANOLA Z CZERWONYMI OWOCAMI 240g": "GRANOLA S ČERVENÝM OVOCEM 240g",
+  "DONUTY BIAŁE 90 g": "DONUTY BÍLÉ 90g",
+  "DONUTY ORZECHOWE 90 g": "DONUTY OŘÍŠKOVÉ 90g",
+  "GIRINGIRO ciastka 200 g": "GIRINGIRO SUŠENKY 200g",
+  "CROSTATINE ORZECHY LASKOWE": "CROSTATINE LÍSKOOŘÍŠKOVÉ 200g",
+  "CROSTATINE MORELOWE 200 g": "CROSTATINE MERUŇKOVÉ 200g",
+  "CROSTATINE Z OWOCAMI LEŚNYMI": "CROSTATINE S LESNÍM OVOCEM 200g",
+  "PASTA Z ORZECHÓW LASKOWYCH GOLOMIX CREMA 200g": "GOLOMIX KRÉM Z LÍSKOVÝCH OŘÍŠKŮ 200g",
+  "GOLOMIX Ciasteczka kakaowe z gwiazdkami 200g": "GOLOMIX SUŠENKY S KAKAEM A HVĚZDIČKAMI 200g",
+  "PIŠKOTOWY CHLEBIK Z CZEKOLADĄ (270g)": "PIŠKOTOVÝ CHLEBÍČEK S ČOKOLÁDOU 270g",
+  "MĄKA UNIWERSALNA 1000g": "UNIVERZÁLNÍ MOUKA 1000g",
+  "COUS COUS 375g": "KUSKUS 375g",
+  "BROWNIES 200g": "BROWNIES 200g",
+};
 
 async function fetchFullDocument(): Promise<string> {
   const response = await fetch(DOC_URL);
@@ -56,24 +58,87 @@ async function fetchFullDocument(): Promise<string> {
 function extractPolishLabels(text: string): ParsedPolishLabel[] {
   const labels: ParsedPolishLabel[] = [];
   
-  // Find all Polish label blocks - they start with a product code and contain "Składniki:"
-  const regex = /([A-Z][A-Z0-9]{2,4})\s*\n\s*([^\n]+)\n[\s\S]*?Składniki:\s*([^\n]+(?:\n(?!Wartości|Producent)[^\n]+)*)\s*(?:Wartości odżywcze[^\n]*\n)?(?:Wartość energetyczna:\s*)?([^\n]*(?:\n(?!Producent|Przechow)[^\n]+)*)\s*(?:Przechowywać[^\n]*\n)?\s*Producent:\s*([^\n]+)/gi;
+  // Split by tabs/newlines to find product blocks
+  // Look for pattern: CODE\n\tPRODUCT_NAME\n\tSkładniki:...
+  const blocks = text.split(/\n\s*\n+/);
   
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const productCode = match[1];
-    const productName = match[2].trim();
-    const skladniki = match[3].replace(/\s+/g, ' ').trim();
-    const wartosci = match[4].replace(/\s+/g, ' ').trim();
-    const producent = match[5].trim();
+  for (const block of blocks) {
+    // Check if block contains Polish ingredients
+    if (!block.includes("Składniki:")) continue;
     
-    // Only include if it has Polish markers
-    if (skladniki && productName) {
+    const lines = block.split('\n').map(l => l.replace(/^\t+/, '').trim()).filter(l => l);
+    
+    let code = "";
+    let productName = "";
+    let skladniki = "";
+    let wartosci = "";
+    let producent = "";
+    let inSkladniki = false;
+    let inWartosci = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Product code (e.g., D060, CO10, S038)
+      if (line.match(/^[A-Z][A-Z0-9]{2,4}$/) && !code) {
+        code = line;
+        continue;
+      }
+      
+      // Product name (line after code, or first uppercase line with product info)
+      if (!productName && code && !line.startsWith("Składniki")) {
+        productName = line;
+        continue;
+      }
+      
+      // Ingredients
+      if (line.startsWith("Składniki:")) {
+        inSkladniki = true;
+        inWartosci = false;
+        skladniki = line.replace("Składniki:", "").trim();
+        continue;
+      }
+      
+      // Nutritional values
+      if (line.startsWith("Wartości odżywcze") || line.startsWith("Wartość energetyczna")) {
+        inSkladniki = false;
+        inWartosci = true;
+        if (line.includes("Wartość energetyczna")) {
+          wartosci = line;
+        }
+        continue;
+      }
+      
+      // Producer
+      if (line.startsWith("Producent:")) {
+        inSkladniki = false;
+        inWartosci = false;
+        producent = line.replace("Producent:", "").trim();
+        continue;
+      }
+      
+      // Skip storage info
+      if (line.startsWith("Przechowywać") || line.startsWith("Minimalny okres")) {
+        inSkladniki = false;
+        inWartosci = false;
+        continue;
+      }
+      
+      // Continue collecting based on state
+      if (inSkladniki && !line.startsWith("Wartości") && !line.startsWith("Producent")) {
+        skladniki += " " + line;
+      } else if (inWartosci && !line.startsWith("Producent") && !line.startsWith("Przechowywać")) {
+        wartosci += " " + line;
+      }
+    }
+    
+    if (productName && skladniki) {
       labels.push({
-        polishName: productName,
-        skladniki,
-        wartosciOdzywcze: wartosci,
-        producent,
+        code,
+        polishName: productName.trim(),
+        skladniki: skladniki.trim(),
+        wartosciOdzywcze: wartosci.trim(),
+        producent: producent || "Piaceri Mediterranei – Włochy",
       });
     }
   }
@@ -82,79 +147,29 @@ function extractPolishLabels(text: string): ParsedPolishLabel[] {
 }
 
 function findCzechProductName(polishName: string): string | null {
-  for (const matcher of productMatchers) {
-    if (matcher.pattern.test(polishName)) {
-      return matcher.czechProductName;
+  // Direct mapping
+  if (polishToCzechMap[polishName]) {
+    return polishToCzechMap[polishName];
+  }
+  
+  // Try to find partial matches
+  for (const [pl, cz] of Object.entries(polishToCzechMap)) {
+    // Normalize and compare
+    const plNorm = pl.toLowerCase().replace(/\s+/g, ' ').replace(/[()]/g, '');
+    const searchNorm = polishName.toLowerCase().replace(/\s+/g, ' ').replace(/[()]/g, '');
+    
+    if (plNorm === searchNorm || searchNorm.includes(plNorm) || plNorm.includes(searchNorm)) {
+      return cz;
     }
   }
+  
   return null;
 }
 
 export async function POST() {
   try {
     const documentText = await fetchFullDocument();
-    
-    // Manual extraction based on document structure
-    const polishBlocks: ParsedPolishLabel[] = [];
-    
-    // Split by double newlines and look for Polish content
-    const sections = documentText.split(/\n\t*\n/);
-    
-    for (let i = 0; i < sections.length; i++) {
-      const section = sections[i];
-      
-      // Check if section contains Polish ingredients
-      if (section.includes("Składniki:")) {
-        // Try to find the product name (usually uppercase, before Składniki)
-        const lines = section.split('\n').map(l => l.trim()).filter(l => l);
-        
-        let productName = "";
-        let skladniki = "";
-        let wartosci = "";
-        let producent = "";
-        
-        for (let j = 0; j < lines.length; j++) {
-          const line = lines[j];
-          
-          // Product name is usually in uppercase
-          if (!productName && line.match(/^[A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ\s\-\(\)0-9g]+$/u) && line.length > 3) {
-            productName = line;
-          }
-          
-          if (line.startsWith("Składniki:")) {
-            skladniki = line.replace("Składniki:", "").trim();
-            // Collect continuation lines
-            for (let k = j + 1; k < lines.length; k++) {
-              const nextLine = lines[k];
-              if (nextLine.startsWith("Wartości") || nextLine.startsWith("Producent") || nextLine.match(/^[A-Z][0-9]{2,3}$/)) {
-                break;
-              }
-              skladniki += " " + nextLine;
-            }
-          }
-          
-          if (line.includes("Wartość energetyczna:") || line.match(/^\d+\s*kJ/)) {
-            wartosci += " " + line;
-          }
-          if (line.match(/^Tłuszcze|^Węglowodany/)) {
-            wartosci += " " + line;
-          }
-          
-          if (line.startsWith("Producent:")) {
-            producent = line.replace("Producent:", "").trim();
-          }
-        }
-        
-        if (productName && skladniki) {
-          polishBlocks.push({
-            polishName: productName,
-            skladniki: skladniki.trim(),
-            wartosciOdzywcze: wartosci.trim(),
-            producent: producent || "Piaceri Mediterranei – Włochy",
-          });
-        }
-      }
-    }
+    const polishLabels = extractPolishLabels(documentText);
     
     // Get existing Czech labels
     const czechLabels = await prisma.productLabel.findMany({
@@ -167,26 +182,28 @@ export async function POST() {
     }
     
     const results = {
-      found: polishBlocks.length,
+      found: polishLabels.length,
       matched: 0,
       created: 0,
       alreadyExists: 0,
+      czechNotFound: 0,
       errors: [] as string[],
       matchedProducts: [] as { polish: string; czech: string }[],
       unmatchedProducts: [] as string[],
     };
     
-    for (const plLabel of polishBlocks) {
+    for (const plLabel of polishLabels) {
       const czechProductName = findCzechProductName(plLabel.polishName);
       
       if (!czechProductName) {
-        results.unmatchedProducts.push(plLabel.polishName);
+        results.unmatchedProducts.push(`${plLabel.code}: ${plLabel.polishName}`);
         continue;
       }
       
       const czechLabel = czechLabelMap.get(czechProductName);
       if (!czechLabel) {
-        results.errors.push(`Czech label not found in DB: ${czechProductName} (from PL: ${plLabel.polishName})`);
+        results.czechNotFound++;
+        results.errors.push(`Czech label not in DB: "${czechProductName}" (from PL: ${plLabel.polishName})`);
         continue;
       }
       
@@ -208,20 +225,14 @@ export async function POST() {
         continue;
       }
       
-      // Format nutritional values
-      let nutri = plLabel.wartosciOdzywcze;
-      if (!nutri.includes("kJ") && !nutri.includes("kcal")) {
-        nutri = "";
-      }
-      
       // Create Polish label
       try {
         await prisma.productLabel.create({
           data: {
-            productName: czechProductName,
-            nazev: plLabel.polishName,
+            productName: czechProductName, // Use Czech productName for matching
+            nazev: plLabel.polishName, // Polish display name
             slozeni: plLabel.skladniki,
-            nutricniHodnoty: nutri || "Wartości odżywcze - patrz opakowanie",
+            nutricniHodnoty: plLabel.wartosciOdzywcze || "Wartości odżywcze - patrz opakowanie",
             skladovani: "Przechowywać w suchym miejscu w temperaturze pokojowej.",
             vyrobce: plLabel.producent,
             language: "pl",
@@ -244,16 +255,21 @@ export async function POST() {
 }
 
 export async function GET() {
-  // List existing Czech labels for reference
   const czechLabels = await prisma.productLabel.findMany({
     where: { language: "cs" },
     select: { productName: true },
   });
   
+  const polishLabels = await prisma.productLabel.findMany({
+    where: { language: "pl" },
+    select: { productName: true, nazev: true },
+  });
+  
   return NextResponse.json({
     message: "POST to this endpoint to import Polish labels from Google Doc",
-    matcherCount: productMatchers.length,
+    mappingCount: Object.keys(polishToCzechMap).length,
     czechLabelCount: czechLabels.length,
-    czechLabels: czechLabels.map(l => l.productName),
+    polishLabelCount: polishLabels.length,
+    existingPolishLabels: polishLabels,
   });
 }
