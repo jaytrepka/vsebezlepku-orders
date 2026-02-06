@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const DOC_URL = "https://docs.google.com/document/d/1WeddfeCuDqLcauAVxWjVO99iu_2t32riFLzr1gajrkE/export?format=txt";
+const DOC_URL_HTML = "https://docs.google.com/document/d/1WeddfeCuDqLcauAVxWjVO99iu_2t32riFLzr1gajrkE/export?format=html";
+const DOC_URL_TXT = "https://docs.google.com/document/d/1WeddfeCuDqLcauAVxWjVO99iu_2t32riFLzr1gajrkE/export?format=txt";
 
 interface ParsedPolishLabel {
   code: string;
@@ -97,11 +98,139 @@ const polishToCzechMap: Record<string, string> = {
 };
 
 async function fetchFullDocument(): Promise<string> {
-  const response = await fetch(DOC_URL);
+  const response = await fetch(DOC_URL_TXT);
   if (!response.ok) {
     throw new Error(`Failed to fetch document: ${response.status}`);
   }
   return response.text();
+}
+
+// Fetch HTML version and convert bold tags to **bold** markers
+async function fetchHtmlDocument(): Promise<string> {
+  const response = await fetch(DOC_URL_HTML);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch HTML document: ${response.status}`);
+  }
+  let html = await response.text();
+  
+  // Convert <b> and <strong> tags to **text** markers
+  // Also handle <span style="font-weight:700"> or similar
+  html = html.replace(/<b\b[^>]*>([^<]*)<\/b>/gi, '**$1**');
+  html = html.replace(/<strong\b[^>]*>([^<]*)<\/strong>/gi, '**$1**');
+  html = html.replace(/<span[^>]*font-weight:\s*(bold|700|800|900)[^>]*>([^<]*)<\/span>/gi, '**$2**');
+  
+  // Remove all other HTML tags
+  html = html.replace(/<[^>]+>/g, ' ');
+  
+  // Decode HTML entities
+  html = html.replace(/&nbsp;/g, ' ');
+  html = html.replace(/&amp;/g, '&');
+  html = html.replace(/&lt;/g, '<');
+  html = html.replace(/&gt;/g, '>');
+  html = html.replace(/&quot;/g, '"');
+  html = html.replace(/&#39;/g, "'");
+  
+  // Normalize whitespace but preserve **markers**
+  html = html.replace(/\s+/g, ' ');
+  
+  return html;
+}
+
+function extractPolishLabelsFromHtml(text: string): ParsedPolishLabel[] {
+  const labels: ParsedPolishLabel[] = [];
+  
+  // The HTML is now flattened to one line with **bold** markers
+  // Find all "Składniki:" sections and extract content
+  const skladnikiPattern = /Składniki:\s*([^S]*?)(?=Wartości odżywcze|Wartość energetyczna|Przechowywać|$)/gi;
+  const productPattern = /([A-Z][A-Z0-9]{2,4})\s+([A-ZŻŹĆŃÓŁĘĄŚ][^S]*?)\s+Składniki:/gi;
+  
+  // Alternative: find Składniki and work backwards/forwards
+  const parts = text.split(/Składniki:\s*/i);
+  
+  for (let i = 1; i < parts.length; i++) {
+    const beforePart = parts[i - 1];
+    const afterPart = parts[i];
+    
+    // Extract product name from end of previous part
+    // Look for pattern like "D136 BROWNIES 200g" or just product name
+    const beforeWords = beforePart.trim().split(/\s+/);
+    let productName = "";
+    let code = "";
+    
+    // Work backwards to find product name (after a code like D136)
+    for (let j = beforeWords.length - 1; j >= 0 && j >= beforeWords.length - 20; j--) {
+      const word = beforeWords[j];
+      if (/^[A-Z][A-Z0-9]{2,4}$/.test(word)) {
+        code = word;
+        productName = beforeWords.slice(j + 1).join(' ').trim();
+        break;
+      }
+    }
+    
+    // If no code found, take last few words as product name
+    if (!productName && beforeWords.length > 0) {
+      const lastWords = beforeWords.slice(-10).join(' ');
+      // Look for uppercase product name pattern
+      const nameMatch = lastWords.match(/([A-ZŻŹĆŃÓŁĘĄŚ][A-ZŻŹĆŃÓŁĘĄŚa-zżźćńółęąś0-9\s()%-]+)$/);
+      if (nameMatch) {
+        productName = nameMatch[1].trim();
+      }
+    }
+    
+    if (!productName || productName.length < 3) continue;
+    
+    // Skip Czech labels (they have "Složení:" not "Składniki:")
+    if (beforePart.includes("Složení:") && !beforePart.includes("Składniki:")) continue;
+    
+    // Extract ingredients - everything until "Wartości" or "Przechowywać"
+    let skladniki = "";
+    let wartosci = "";
+    let producent = "";
+    
+    // Find where ingredients end
+    const wartosciMatch = afterPart.match(/^(.*?)(Wartości odżywcze|Wartość energetyczna)/i);
+    if (wartosciMatch) {
+      skladniki = wartosciMatch[1].trim();
+      
+      // Extract nutritional values
+      const afterWartosci = afterPart.substring(wartosciMatch.index! + wartosciMatch[0].length);
+      const producentMatch = afterWartosci.match(/^(.*?)Producent:\s*([^P]*?)(?=Przechowywać|Minimalny|[A-Z][A-Z0-9]{2,4}\s|$)/i);
+      if (producentMatch) {
+        wartosci = (wartosciMatch[2] + producentMatch[1]).trim();
+        producent = producentMatch[2].trim();
+      } else {
+        // Just get some nutritional info
+        const nutMatch = afterWartosci.match(/^(.{0,500}?)(?=Przechowywać|Minimalny|[A-Z][A-Z0-9]{2,4}\s)/i);
+        if (nutMatch) {
+          wartosci = nutMatch[1].trim();
+        }
+      }
+    } else {
+      // No Wartości found, just take ingredients until next section
+      const endMatch = afterPart.match(/^(.*?)(?=Przechowywać|Producent:|[A-Z][A-Z0-9]{2,4}\s)/i);
+      if (endMatch) {
+        skladniki = endMatch[1].trim();
+      } else {
+        skladniki = afterPart.substring(0, 500).trim();
+      }
+    }
+    
+    // Clean up skladniki - preserve **bold** markers
+    skladniki = skladniki.replace(/\s+/g, ' ').trim();
+    
+    // Skip if skladniki is too short or doesn't look like ingredients
+    if (skladniki.length < 10) continue;
+    
+    labels.push({
+      code,
+      polishName: productName.replace(/\*\*/g, '').trim(), // Remove bold from name
+      skladniki: skladniki,
+      wartosciOdzywcze: wartosci.replace(/\s+/g, ' ').trim(),
+      producent: producent || "Piaceri Mediterranei – Włochy",
+    });
+  }
+  
+  return labels;
 }
 
 function extractPolishLabels(text: string): ParsedPolishLabel[] {
@@ -229,10 +358,21 @@ function findCzechProductName(polishName: string): string | null {
   return null;
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const documentText = await fetchFullDocument();
-    const polishLabels = extractPolishLabels(documentText);
+    // Check if we should use HTML version (for bold allergens)
+    const url = new URL(request.url);
+    const useHtml = url.searchParams.get('html') === 'true';
+    
+    let polishLabels: ParsedPolishLabel[];
+    
+    if (useHtml) {
+      const htmlText = await fetchHtmlDocument();
+      polishLabels = extractPolishLabelsFromHtml(htmlText);
+    } else {
+      const documentText = await fetchFullDocument();
+      polishLabels = extractPolishLabels(documentText);
+    }
     
     // Get existing Czech labels
     const czechLabels = await prisma.productLabel.findMany({
