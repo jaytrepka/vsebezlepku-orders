@@ -261,6 +261,7 @@ function findOptimalFontSize(
   for (let size = maxSize; size >= minSize; size -= 0.25) {
     const lineHeight = size * 1.15;
     const titleLineHeight = (size + 1) * 1.15;
+    const separatorHeight = 4; // 2px before + 2px after each separator line
     
     // Calculate title lines
     const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
@@ -269,19 +270,19 @@ function findOptimalFontSize(
     // Složení section (use plain text for height calc, bold doesn't change line count much)
     const slozeniPlain = "Složení: " + label.slozeni.replace(/\*\*/g, '');
     const slozeniLines = wrapTextWithFont(slozeniPlain, contentWidth, size, font);
-    totalHeight += slozeniLines.length * lineHeight + 1;
+    totalHeight += slozeniLines.length * lineHeight + separatorHeight;
     
     // Nutriční hodnoty section (header may wrap to 2 lines + content)
     const nutriHeaderTest = "Nutriční hodnoty (100g):";
     const nutriHeaderWidth = fontBold.widthOfTextAtSize(nutriHeaderTest, size);
     totalHeight += nutriHeaderWidth <= contentWidth ? lineHeight : lineHeight * 2; // header
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
-    totalHeight += nutriLines.length * lineHeight + 1;
+    totalHeight += nutriLines.length * lineHeight + separatorHeight;
     
     // Info (optional) - no prefix
     if (label.skladovani) {
       const infoLines = wrapTextWithFont(label.skladovani, contentWidth, size, font);
-      totalHeight += infoLines.length * lineHeight + 1;
+      totalHeight += infoLines.length * lineHeight + separatorHeight;
     }
     
     // Výrobce
@@ -434,6 +435,15 @@ function drawLabel(
   }
   currentY -= 2;
   
+  // Separator line after Složení
+  page.drawLine({
+    start: { x: x + padding, y: currentY },
+    end: { x: x + LABEL_WIDTH - padding, y: currentY },
+    color: borderColor,
+    thickness: 0.3,
+  });
+  currentY -= 2;
+  
   // === NUTRIČNÍ HODNOTY ===
   const nutriHeader = "Nutriční hodnoty (100g):";
   const nutriHeaderWidth = fontBold.widthOfTextAtSize(nutriHeader, fontSize);
@@ -481,6 +491,15 @@ function drawLabel(
   }
   currentY -= 2;
   
+  // Separator line after Nutriční hodnoty
+  page.drawLine({
+    start: { x: x + padding, y: currentY },
+    end: { x: x + LABEL_WIDTH - padding, y: currentY },
+    color: borderColor,
+    thickness: 0.3,
+  });
+  currentY -= 2;
+  
   // === INFO (optional, no prefix - raw text) ===
   if (label.skladovani) {
     const infoLines = wrapTextWithFont(label.skladovani, maxTextWidth, fontSize, font);
@@ -495,6 +514,15 @@ function drawLabel(
         color: rgb(0, 0, 0),
       });
     }
+    currentY -= 2;
+    
+    // Separator line after Info
+    page.drawLine({
+      start: { x: x + padding, y: currentY },
+      end: { x: x + LABEL_WIDTH - padding, y: currentY },
+      color: borderColor,
+      thickness: 0.3,
+    });
     currentY -= 2;
   }
   
