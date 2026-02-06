@@ -249,6 +249,10 @@ function extractPolishLabelsFromHtml(text: string): ParsedPolishLabel[] {
     
     // Clean up skladniki but preserve **bold** markers
     skladniki = skladniki.replace(/\s+/g, ' ').trim();
+    // Remove leading/trailing ** that aren't properly paired
+    skladniki = skladniki.replace(/^\*\*\s*/, '').replace(/\s*\*\*$/, '');
+    // Fix empty bold markers
+    skladniki = skladniki.replace(/\*\*\s*\*\*/g, '');
     
     // Skip if skladniki is too short
     if (skladniki.length < 10) continue;
