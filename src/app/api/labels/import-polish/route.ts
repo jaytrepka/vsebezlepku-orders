@@ -118,13 +118,20 @@ async function fetchHtmlDocument(): Promise<string> {
   const cssMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
   if (cssMatch) {
     const css = cssMatch[1];
-    // Find all class definitions with font-weight:700 or font-weight:bold
-    const classPattern = /\.([a-z0-9]+)\{[^}]*font-weight:\s*(700|bold)[^}]*\}/gi;
-    let match;
-    while ((match = classPattern.exec(css)) !== null) {
-      boldClasses.add(match[1]);
+    // Find all class definitions - split by closing braces
+    const classBlocks = css.split('}');
+    for (const block of classBlocks) {
+      // Check if this block contains font-weight:700 (not 400)
+      if (block.includes('font-weight:700') || block.includes('font-weight: 700') || block.includes('font-weight:bold')) {
+        const classMatch = block.match(/\.([a-z0-9]+)\{/i);
+        if (classMatch) {
+          boldClasses.add(classMatch[1]);
+        }
+      }
     }
   }
+  
+  console.log('Found bold classes:', Array.from(boldClasses));
   
   // Convert spans with bold classes to **text** markers
   // Build a regex pattern for all bold classes
@@ -174,50 +181,41 @@ async function fetchHtmlDocument(): Promise<string> {
 function extractPolishLabelsFromHtml(text: string): ParsedPolishLabel[] {
   const labels: ParsedPolishLabel[] = [];
   
-  // The HTML is now flattened to one line with **bold** markers
-  // Find all "Składniki:" sections and extract content
-  const skladnikiPattern = /Składniki:\s*([^S]*?)(?=Wartości odżywcze|Wartość energetyczna|Przechowywać|$)/gi;
-  const productPattern = /([A-Z][A-Z0-9]{2,4})\s+([A-ZŻŹĆŃÓŁĘĄŚ][^S]*?)\s+Składniki:/gi;
-  
-  // Alternative: find Składniki and work backwards/forwards
+  // Split by Składniki: (case insensitive)
   const parts = text.split(/Składniki:\s*/i);
   
   for (let i = 1; i < parts.length; i++) {
     const beforePart = parts[i - 1];
     const afterPart = parts[i];
     
-    // Extract product name from end of previous part
-    // Look for pattern like "D136 BROWNIES 200g" or just product name
-    const beforeWords = beforePart.trim().split(/\s+/);
+    // Clean bold markers for product name extraction, but keep original for ingredients
+    const beforeClean = beforePart.replace(/\*\*/g, ' ').replace(/\s+/g, ' ');
+    const beforeWords = beforeClean.trim().split(/\s+/);
+    
     let productName = "";
     let code = "";
     
-    // Work backwards to find product name (after a code like D136)
-    for (let j = beforeWords.length - 1; j >= 0 && j >= beforeWords.length - 20; j--) {
+    // Work backwards to find product code (like CO10, D136, etc.) 
+    // Product codes are 2-5 characters starting with a letter, followed by digits
+    for (let j = beforeWords.length - 1; j >= 0 && j >= beforeWords.length - 25; j--) {
       const word = beforeWords[j];
-      if (/^[A-Z][A-Z0-9]{2,4}$/.test(word)) {
+      // Match product codes like CO10, D136, S042, P019
+      if (/^[A-Z]{1,2}[0-9]{2,4}$/.test(word)) {
         code = word;
+        // Product name is everything after the code until "Składniki:"
         productName = beforeWords.slice(j + 1).join(' ').trim();
         break;
       }
     }
     
-    // If no code found, take last few words as product name
-    if (!productName && beforeWords.length > 0) {
-      const lastWords = beforeWords.slice(-10).join(' ');
-      // Look for uppercase product name pattern
-      const nameMatch = lastWords.match(/([A-ZŻŹĆŃÓŁĘĄŚ][A-ZŻŹĆŃÓŁĘĄŚa-zżźćńółęąś0-9\s()%-]+)$/);
-      if (nameMatch) {
-        productName = nameMatch[1].trim();
-      }
-    }
-    
+    // Skip if no valid product name found
     if (!productName || productName.length < 3) continue;
     
-    // Skip Czech labels (they have "Složení:" not "Składniki:")
+    // Skip Czech labels (look for Czech markers nearby)
     if (beforePart.includes("Složení:") && !beforePart.includes("Składniki:")) continue;
     
     // Extract ingredients - everything until "Wartości" or "Przechowywać"
+    // Keep the bold markers for ingredients
     let skladniki = "";
     let wartosci = "";
     let producent = "";
@@ -227,22 +225,21 @@ function extractPolishLabelsFromHtml(text: string): ParsedPolishLabel[] {
     if (wartosciMatch) {
       skladniki = wartosciMatch[1].trim();
       
-      // Extract nutritional values
+      // Extract nutritional values and producer
       const afterWartosci = afterPart.substring(wartosciMatch.index! + wartosciMatch[0].length);
-      const producentMatch = afterWartosci.match(/^(.*?)Producent:\s*([^P]*?)(?=Przechowywać|Minimalny|[A-Z][A-Z0-9]{2,4}\s|$)/i);
+      const producentMatch = afterWartosci.match(/^(.*?)Producent:\s*([^P]*?)(?=Przechowywać|Minimalny|[A-Z]{1,2}[0-9]{2,4}\s|$)/i);
       if (producentMatch) {
-        wartosci = (wartosciMatch[2] + producentMatch[1]).trim();
-        producent = producentMatch[2].trim();
+        wartosci = (wartosciMatch[2] + producentMatch[1]).replace(/\*\*/g, '').trim();
+        producent = producentMatch[2].replace(/\*\*/g, '').trim();
       } else {
-        // Just get some nutritional info
-        const nutMatch = afterWartosci.match(/^(.{0,500}?)(?=Przechowywać|Minimalny|[A-Z][A-Z0-9]{2,4}\s)/i);
+        const nutMatch = afterWartosci.match(/^(.{0,500}?)(?=Przechowywać|Minimalny|[A-Z]{1,2}[0-9]{2,4}\s)/i);
         if (nutMatch) {
-          wartosci = nutMatch[1].trim();
+          wartosci = nutMatch[1].replace(/\*\*/g, '').trim();
         }
       }
     } else {
-      // No Wartości found, just take ingredients until next section
-      const endMatch = afterPart.match(/^(.*?)(?=Przechowywać|Producent:|[A-Z][A-Z0-9]{2,4}\s)/i);
+      // No Wartości found, take ingredients until next section
+      const endMatch = afterPart.match(/^(.*?)(?=Przechowywać|Producent:|[A-Z]{1,2}[0-9]{2,4}\s)/i);
       if (endMatch) {
         skladniki = endMatch[1].trim();
       } else {
@@ -250,15 +247,15 @@ function extractPolishLabelsFromHtml(text: string): ParsedPolishLabel[] {
       }
     }
     
-    // Clean up skladniki - preserve **bold** markers
+    // Clean up skladniki but preserve **bold** markers
     skladniki = skladniki.replace(/\s+/g, ' ').trim();
     
-    // Skip if skladniki is too short or doesn't look like ingredients
+    // Skip if skladniki is too short
     if (skladniki.length < 10) continue;
     
     labels.push({
       code,
-      polishName: productName.replace(/\*\*/g, '').trim(), // Remove bold from name
+      polishName: productName,
       skladniki: skladniki,
       wartosciOdzywcze: wartosci.replace(/\s+/g, ' ').trim(),
       producent: producent || "Piaceri Mediterranei – Włochy",
