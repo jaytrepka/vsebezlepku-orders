@@ -48,6 +48,31 @@ export interface LabelRequest {
   quantity: number;
 }
 
+// Language-specific label headers
+type LabelLanguage = "cs" | "pl" | "sk";
+
+const labelHeaders: Record<LabelLanguage, {
+  slozeni: string;
+  nutricniHodnoty: string;
+  vyrobce: string;
+}> = {
+  cs: {
+    slozeni: "Složení:",
+    nutricniHodnoty: "Nutriční hodnoty (100g):",
+    vyrobce: "Výrobce:",
+  },
+  pl: {
+    slozeni: "Składniki:",
+    nutricniHodnoty: "Wartości odżywcze (na 100 g):",
+    vyrobce: "Producent:",
+  },
+  sk: {
+    slozeni: "Zloženie:",
+    nutricniHodnoty: "Nutričné hodnoty (na 100g):",
+    vyrobce: "Výrobca:",
+  },
+};
+
 // Text segment with optional bold flag
 interface TextSegment {
   text: string;
@@ -253,7 +278,8 @@ function findOptimalFontSize(
   contentWidth: number,
   availableHeight: number,
   font: PDFFont,
-  fontBold: PDFFont
+  fontBold: PDFFont,
+  headers: typeof labelHeaders["cs"]
 ): number {
   const minSize = 3;
   const maxSize = 14;
@@ -268,14 +294,14 @@ function findOptimalFontSize(
     let totalHeight = titleLines.length * titleLineHeight + separatorHeight; // title + separator
     
     // Složení section (use plain text for height calc, bold doesn't change line count much)
-    const slozeniPlain = "Složení: " + label.slozeni.replace(/\*\*/g, '');
+    const slozeniPlain = headers.slozeni + " " + label.slozeni.replace(/\*\*/g, '');
     const slozeniLines = wrapTextWithFont(slozeniPlain, contentWidth, size, font);
     totalHeight += slozeniLines.length * lineHeight + separatorHeight;
     
-    // Nutriční hodnoty section (header may wrap to 2 lines + content)
-    const nutriHeaderTest = "Nutriční hodnoty (100g):";
-    const nutriHeaderWidth = fontBold.widthOfTextAtSize(nutriHeaderTest, size);
-    totalHeight += nutriHeaderWidth <= contentWidth ? lineHeight : lineHeight * 2; // header
+    // Nutriční hodnoty section (header may wrap + content)
+    const nutriHeaderWidth = fontBold.widthOfTextAtSize(headers.nutricniHodnoty, size);
+    const nutriHeaderLines = nutriHeaderWidth <= contentWidth ? 1 : Math.ceil(nutriHeaderWidth / contentWidth);
+    totalHeight += nutriHeaderLines * lineHeight;
     const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
     totalHeight += nutriLines.length * lineHeight + separatorHeight;
     
@@ -286,7 +312,7 @@ function findOptimalFontSize(
     }
     
     // Výrobce
-    const vyrobceLines = wrapTextWithFont("Výrobce: " + label.vyrobce, contentWidth, size, font);
+    const vyrobceLines = wrapTextWithFont(headers.vyrobce + " " + label.vyrobce, contentWidth, size, font);
     totalHeight += vyrobceLines.length * lineHeight;
     
     if (totalHeight <= availableHeight) {
@@ -304,7 +330,8 @@ function drawLabel(
   x: number,
   y: number,
   font: PDFFont,
-  fontBold: PDFFont
+  fontBold: PDFFont,
+  headers: typeof labelHeaders["cs"]
 ) {
   const padding = 3;
   const contentWidth = LABEL_WIDTH - 2 * padding;
@@ -323,7 +350,7 @@ function drawLabel(
   });
   
   // Find optimal font size (use most of available height)
-  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 2, font, fontBold);
+  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 2, font, fontBold, headers);
   const lineHeight = fontSize * 1.15;
   const titleSize = fontSize + 1;
   const titleLineHeight = titleSize * 1.15;
@@ -368,7 +395,8 @@ function drawLabel(
   currentY -= 1;
   
   // === SLOŽENÍ (with bold support) ===
-  const slozeniText = "Složení: " + label.slozeni;
+  const slozeniHeader = headers.slozeni;
+  const slozeniText = slozeniHeader + " " + label.slozeni;
   const slozeniSegmentLines = wrapTextWithBold(slozeniText, maxTextWidth, fontSize, font, fontBold);
   
   for (let i = 0; i < slozeniSegmentLines.length; i++) {
@@ -376,21 +404,21 @@ function drawLabel(
     let drawX = textX;
     const segments = slozeniSegmentLines[i];
     
-    // First line: make "Složení:" bold regardless
+    // First line: make header bold regardless
     if (i === 0 && segments.length > 0) {
       const firstSegText = segments[0].text;
-      if (firstSegText.startsWith("Složení:")) {
-        // Draw "Složení:" in bold
-        page.drawText("Složení:", {
+      if (firstSegText.startsWith(slozeniHeader)) {
+        // Draw header in bold
+        page.drawText(slozeniHeader, {
           x: drawX,
           y: currentY,
           size: fontSize,
           font: fontBold,
           color: rgb(0, 0, 0),
         });
-        drawX += fontBold.widthOfTextAtSize("Složení:", fontSize);
+        drawX += fontBold.widthOfTextAtSize(slozeniHeader, fontSize);
         // Draw rest of first segment
-        const restOfFirst = firstSegText.substring("Složení:".length);
+        const restOfFirst = firstSegText.substring(slozeniHeader.length);
         if (restOfFirst) {
           const restFont = segments[0].bold ? fontBold : font;
           page.drawText(restOfFirst, {
@@ -456,7 +484,7 @@ function drawLabel(
   currentY -= 2;
   
   // === NUTRIČNÍ HODNOTY ===
-  const nutriHeader = "Nutriční hodnoty (100g):";
+  const nutriHeader = headers.nutricniHodnoty;
   const nutriHeaderWidth = fontBold.widthOfTextAtSize(nutriHeader, fontSize);
   
   if (nutriHeaderWidth <= maxTextWidth) {
@@ -470,23 +498,18 @@ function drawLabel(
       color: rgb(0, 0, 0),
     });
   } else {
-    // Wrap to two lines
-    currentY -= lineHeight;
-    page.drawText("Nutriční hodnoty", {
-      x: textX,
-      y: currentY,
-      size: fontSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
-    });
-    currentY -= lineHeight;
-    page.drawText("(100g):", {
-      x: textX,
-      y: currentY,
-      size: fontSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
-    });
+    // Wrap header to multiple lines
+    const headerLines = wrapTextWithFont(nutriHeader, maxTextWidth, fontSize, fontBold);
+    for (const hLine of headerLines) {
+      currentY -= lineHeight;
+      page.drawText(hLine, {
+        x: textX,
+        y: currentY,
+        size: fontSize,
+        font: fontBold,
+        color: rgb(0, 0, 0),
+      });
+    }
   }
   
   const nutriLines = wrapTextWithFont(label.nutricniHodnoty, maxTextWidth, fontSize, font);
@@ -538,7 +561,8 @@ function drawLabel(
   }
   
   // === VÝROBCE ===
-  const vyrobceText = "Výrobce: " + label.vyrobce;
+  const vyrobceHeader = headers.vyrobce;
+  const vyrobceText = vyrobceHeader + " " + label.vyrobce;
   const vyrobceLines = wrapTextWithFont(vyrobceText, maxTextWidth, fontSize, font);
   
   for (let i = 0; i < vyrobceLines.length; i++) {
@@ -546,15 +570,15 @@ function drawLabel(
     const line = vyrobceLines[i];
     
     if (i === 0) {
-      const prefixWidth = fontBold.widthOfTextAtSize("Výrobce: ", fontSize);
-      page.drawText("Výrobce:", {
+      const prefixWidth = fontBold.widthOfTextAtSize(vyrobceHeader + " ", fontSize);
+      page.drawText(vyrobceHeader, {
         x: textX,
         y: currentY,
         size: fontSize,
         font: fontBold,
         color: rgb(0, 0, 0),
       });
-      const restText = line.substring("Výrobce: ".length);
+      const restText = line.substring((vyrobceHeader + " ").length);
       if (restText) {
         page.drawText(restText, {
           x: textX + prefixWidth,
@@ -578,7 +602,8 @@ function drawLabel(
 
 export async function generateLabelsPDF(
   labels: LabelRequest[],
-  startPosition: number = 1
+  startPosition: number = 1,
+  language: LabelLanguage = "cs"
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
@@ -586,6 +611,8 @@ export async function generateLabelsPDF(
   const fonts = await loadFonts();
   const font = await pdfDoc.embedFont(fonts.regular);
   const fontBold = await pdfDoc.embedFont(fonts.bold);
+  
+  const headers = labelHeaders[language];
 
   // Flatten labels by quantity
   const allLabels: LabelData[] = [];
@@ -618,7 +645,7 @@ export async function generateLabelsPDF(
         const x = MARGIN_X + col * LABEL_WIDTH;
         const y = A4_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
 
-        drawLabel(page, label, x, y, font, fontBold);
+        drawLabel(page, label, x, y, font, fontBold, headers);
       }
     }
   }

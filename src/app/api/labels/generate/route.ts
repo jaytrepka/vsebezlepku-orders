@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Generating PDF with", labelRequests.length, "label requests, startPosition:", startPosition, "language:", language);
 
-    const pdfBytes = await generateLabelsPDF(labelRequests, startPosition);
+    const pdfBytes = await generateLabelsPDF(labelRequests, startPosition, language);
     console.log("PDF generated, size:", pdfBytes.length, "bytes");
 
     return new NextResponse(Buffer.from(pdfBytes), {
