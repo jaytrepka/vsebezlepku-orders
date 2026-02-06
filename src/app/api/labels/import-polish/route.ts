@@ -12,54 +12,88 @@ interface ParsedPolishLabel {
 }
 
 // Direct mapping from Polish product names to Czech productName in database
-// Based on matching product codes, weights, or key identifiers
+// Only products that exist in the database with verified names
 const polishToCzechMap: Record<string, string> = {
-  // Polish name -> Czech productName (as it exists in DB)
+  // Verified matches - Czech labels exist in DB
   "ZBOŻOWE KULKI MIODOWE 300g": "CEREÁLIE MEDOVÉ KROUŽKY 300g",
   "CZEKOLADOWE SERCA BATTITI 200g": "Piaceri Mediterranei ČOKOLÁDOVÁ SRDÍČKA BATTITI 200g",
-  "BATONIKI KOKOSOWE DOGO 120 g": "Piaceri Mediterranei KOKOSOVÉ TYČINKY DOGO 120g",
   "CANTUCCI 200g": "CANTUCCI 200g",
   "MUFFINY Z NADZIENIEM OWOCOWYM 200g": "Piaceri Mediterranei bezlepkové MUFFINY S OVOCNOU NÁPLNÍ 200g (4ks)",
-  "CIOCOMIX BATONIKI 120 g (6 szt.)": "Piaceri Mediterranei bezlepkové CIOCOMIX TYČINKY 120g (6ks)",
-  "SALTERINI CIASTKA 200g": "Piaceri Mediterranei SALTERINI SUŠENKY 200g",
   "BEZGLUTENOWE CRACKERS": "CRACKERS TRADICIONALES 200g",
   "DONUTY PISTACJOWE (90g)": "Piaceri Mediterranei bezlepkové DONUTY PISTÁCIOVÉ 90g",
-  "PIACERINI KARMELOWE CIASTECZKA": "Piaceri Mediterranei PIACERINI KARAMELOVÉ SUŠENKY 81g",
+  "DONUTY PISTACJOWE 90g": "DONUTY PISTÁCIOVÉ 90g",
   "WAFLE PISTACJOWE 150g": "PISTÁCIOVÉ OPLATKY 150g",
   "ATTIMI bezglutenowe ciasteczka orzechowe 120g": "ATTIMI KŘEHKÉ LÍSKOOŘÍŠKOVÉ KOLÁČKY 120g",
   "SFOGLIATINE z polewą morelową 150g": "SFOGLIATINE KŘEHKÉ SUŠENKY S MERUŇKOVOU GLAZUROU 150g",
   "RUSTYKALNY BEZGLUTENOWY CHLEB KROJONY (300g)": "Piaceri Mediterranei RUSTIKÁLNÍ BEZLEPKOVÝ KRÁJENÝ CHLÉB (300g)",
-  "GRISTICK BARS o smaku ziemniaków i rozmarynu 60g": "Piaceri Mediterranei GRISTICK TYČINKY 60g",
   "WRAP PEŁNOZIARNISTY 180 g (3 szt.)": "Piaceri Mediterranei bezlepkový WRAP 180g (3ks)",
-  "GRANOLA CZEKOLADOWA 240g": "Piaceri Mediterranei GRANOLA ČOKOLÁDOVÁ 240g",
-  "GRANOLA Z CZERWONYMI OWOCAMI 240g": "Piaceri Mediterranei GRANOLA S ČERVENÝM OVOCEM 240g",
   "DONUTY BIAŁE 90 g": "Piaceri Mediterranei DONUTY BÍLÉ 90g",
   "DONUTY ORZECHOWE 90 g": "Piaceri Mediterranei DONUTY OŘÍŠKOVÉ 90g",
-  "GIRINGIRO ciastka 200 g": "Piaceri Mediterranei GIRINGIRO SUŠENKY 200g",
-  "CROSTATINE ORZECHY LASKOWE": "Piaceri Mediterranei CROSTATINE LÍSKOOŘÍŠKOVÉ 200g",
   "CROSTATINE MORELOWE 200 g": "Piaceri Mediterranei CROSTATINE MERUŇKOVÉ 200g",
   "CROSTATINE Z OWOCAMI LEŚNYMI": "Piaceri Mediterranei bezlepkové CROSTATINE S LESNÍM OVOCEM 200g",
-  "PASTA Z ORZECHÓW LASKOWYCH GOLOMIX CREMA 200g": "Piaceri Mediterranei GOLOMIX KRÉM Z LÍSKOVÝCH OŘÍŠKŮ 200g",
   "GOLOMIX Ciasteczka kakaowe z gwiazdkami 200g": "Piaceri Mediterranei GOLOMIX KAKAOVÉ SUŠENKY s hvězdičkami 200g",
-  "PIŠKOTOWY CHLEBIK Z CZEKOLADĄ (270g)": "Piaceri Mediterranei PIŠKOTOVÝ CHLEBÍČEK S ČOKOLÁDOU 270g",
-  "MĄKA UNIWERSALNA 1000g": "Piaceri Mediterranei UNIVERZÁLNÍ MOUKA 1000g",
   "COUS COUS 375g": "COUS COUS kukuřičný 375g",
   "BROWNIES 200g": "BROWNIES 200g",
-  // More mappings based on actual DB content
+  // Tortellini/Tortelloni
   "TORTELLINI PROSCIUTTO CRUDO 250g": "Piaceri Mediterranei TORTELLINI PROSCIUTTO CRUDO 250g (2 porce)",
   "TORTELLINI Z MIESEM 250 g (2 porcje)": "Piaceri Mediterranei TORTELLINI S MASEM 250g (2 porce)",
   "Tortelloni z ricottą i szpinakiem 250 g (2 porcje)": "Piaceri Mediterranei TORTELLONI S RICOTTOU A ŠPENÁTEM 250g (2 porce)",
+  // Snacks
   "SFIZI BBQ CHRUPKI 100g": "Piaceri Mediterranei SFIZI BBQ KŘUPKY 100g",
   "BRUSCHETTINE z papryką i chili 100g": "BRUSCHETTINE s paprikou a chilli 100g",
   "BRUSCHETTINE Mediterranee 100g": "BRUSCHETTINE Mediterranee 100g",
+  // Pasta
   "CANNELLONI": "CANNELLONI",
+  // Wafers
   "WAFLE o smaku waniliowym 45g": "Piaceri Mediterranei OPLATKY S VANILKOVOU PŘÍCHUTÍ 45g",
   "WAFLE o smaku ORZECHÓW LASKOWYCH 45g": "Piaceri Mediterranei OPLATKY S LÍSKOOŘÍŠKOVOU PŘÍCHUTÍ 45g",
+  // Sweets
   "CIOCOPUNTA CHOCOLATE MINICORNETS 108g (6szt)": "CIOCOPUNTA ČOKOLÁDOVÉ MINIKORNOUTKY 108g",
   "CIOCOPUNTA PISTACHIO MINICORNETS 108g (6szt)": "Piaceri Mediterranei CIOCOPUNTA PISTÁCIOVÉ MINIKORNOUTKY 108g (6ks)",
   "PIACERINI DUNE WHITE 33g": "Piaceri Mediterranei PIACERINI TYČINKA DUNE WHITE 33g",
-  "SAVOIARDI PIECZYWO CUKROWE 180g": "Piaceri Mediterranei SAVOIARDI PIŠKOTY 180g",
   "GRISSINI CAŁE BATONY ZIARNISTE 160G": "Piaceri Mediterranei GRISSINI TYČINKY 160g",
+  // Bread
+  "PAN BAULETTO 300g": "PAN BAULETTO 300g",
+  "PANE CON NOCI 150g": "PANE CON NOCI 150g",
+  // Cereals
+  "CEREALE KOLOROWE KÓŁKA 300g": "CEREÁLIE DUHOVÉ KROUŽKY 300g",
+  "CEREALE QUADROTTI DARK 300g": "CEREÁLIE QUADROTTI DARK 300g",
+  // Additional pastries
+  "CROISSANT PUSTY 150g": "CROISSANT PRÁZDNÝ 150g",
+  "CROISSANT CZEKOLADOWY 200g": "CROISSANT ČOKOLÁDOVÝ 200g",
+  "CROISSANT MORELOWY 200g": "CROISSANT MERUŇKOVÝ 200g",
+  // Muffins
+  "MUFFIN Z KAWAŁKAMI CZEKOLADY 200g": "MUFFIN S ČOKOLÁDOVÝMI KOUSKY 200g",
+  "MUFFIN Z KAWAŁKAMI CZEKOLADY 50g": "MUFFIN S ČOKOLÁDOVÝMI KOUSKY 50g",
+  // Pasta simple
+  "LASAGNE 250g": "LASAGNE 250g",
+  "FUSILLI 400g": "FUSILLI 400g",
+  "SPAGHETTI 400g": "SPAGHETTI 400g",
+  "PENNE RIGATE 400g": "PENNE RIGATE 400g",
+  "TAGLIATELLE 250g": "TAGLIATELLE 250g",
+  // Cookies/Biscuits
+  "BISCOTTI PETIT 200g": "SUŠENKY BISCOTTI PETIT 200g",
+  "PAVONETTI 140g": "PAVONETTI - bezlepkové křehké sušenky 140g",
+  "VENTAGLIETTI 140g": "VENTAGLIETTI - bezlepkové křehké vějířky 140g",
+  // Cereals bars
+  "BATONIKI ZBOŻOWE ŻURAWINOWE 129g": "Piaceri Mediterranei CEREÁLNÍ TYČINKY S BRUSINKAMI 129g (6ks)",
+  "BATONIKI ZBOŻOWE CZEKOLADOWE 129g": "Piaceri Mediterranei bezlepkové CEREÁLNÍ TYČINKY ČOKOLÁDOVÉ 129g (6ks)",
+  "CEREALNE BATONIKI CZEKOLADOWE 129g (6 szt.)": "CEREÁLNÍ TYČINKY ČOKOLÁDOVÉ 129g",
+  "CEREALNE BATONIKI Z ŻURAWINAMI 129g (6 szt.)": "CEREÁLNÍ TYČINKY S BRUSINKAMI 129g",
+  // Jogurt sušenky
+  "JOGURTOWE CIASTECZKA Z 5 ZIARNAMI 200g": "Piaceri Mediterranei JOGURTOVÉ SUŠENKY S 5 CEREÁLIEMI 200g",
+  "JOGURTOWE CIASTECZKA Z MALINAMI 210g": "Piaceri Mediterranei JOGURTOVÉ SUŠENKY S MALINAMI 210g",
+  // Donuts - larger
+  "DONUTY Z BIAŁĄ POLEWĄ 160g": "DONUTY S BÍLOU POLEVOU 160g",
+  "DONUTY Z BIAŁĄ POLEWĄ 80g": "DONUTY S BÍLOU POLEVOU 80g",
+  "DONUTY Z KAKAOWĄ POLEWĄ 160g": "DONUTY S KAKAOVOU POLEVOU 160g",
+  "DONUTY Z KAKAOWĄ POLEWĄ 80g": "DONUTY S KAKAOVOU POLEVOU 80g",
+  // Canestrelli
+  "KWIATOWE CIASTECZKA CANESTRELLI 125g": "Piaceri Mediterranei bezlepkové KYTIČKOVÉ SUŠENKY CANESTRELLI 125g",
+  "KWIATOWE CIASTECZKA CANESTRELLI 36g": "Piaceri Mediterranei bezlepkové KYTIČKOVÉ SUŠENKY CANESTRELLI 36g",
+  // Piacerini
+  "PIACERINI PISTACJOWE CIASTECZKA 60g": "Piaceri Mediterranei bezlepkové PIACERINI PISTÁCIOVÉ SUŠENKY 60g Bezlepkové vaflové sušenky s pistáciovou náplní",
+  "PIACERINI CIASTECZKA Z BIAŁĄ CZEKOLADĄ 81g": "Piaceri Mediterranei bezlepkové PIACERINI SUŠENKY S BÍLOU ČOKOLÁDOU 81g  Bezlepkové vaflové sušenky s bílou čokoládou",
 };
 
 async function fetchFullDocument(): Promise<string> {
