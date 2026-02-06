@@ -42,6 +42,7 @@ export default function Home() {
     productName: string;
     productUrl?: string;
     isEdit: boolean;
+    language: "cs" | "pl" | "sk";
   } | null>(null);
   const [labelForm, setLabelForm] = useState({
     nazev: "",
@@ -52,6 +53,13 @@ export default function Home() {
   });
   const [fetchingProductInfo, setFetchingProductInfo] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk">("cs");
+
+  const languageNames = {
+    cs: "Čeština",
+    pl: "Polski",
+    sk: "Slovenčina",
+  };
 
   // Calculate total items to print (from selected orders, excluding unchecked items and items without labels)
   const itemsToPrint = orders
@@ -133,7 +141,7 @@ export default function Home() {
       const res = await fetch("/api/labels/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderIds: selectedOrders, startPosition, excludedItemIds: excludedItems }),
+        body: JSON.stringify({ orderIds: selectedOrders, startPosition, excludedItemIds: excludedItems, language: labelLanguage }),
       });
 
       if (!res.ok) {
@@ -171,6 +179,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         productName: labelModal.productName,
+        language: labelModal.language,
         ...labelForm,
       }),
     });
@@ -218,8 +227,8 @@ export default function Home() {
     }
   }
 
-  function openLabelModal(productName: string, existingLabel?: ProductLabel | null, productUrl?: string) {
-    setLabelModal({ open: true, productName, productUrl, isEdit: !!existingLabel });
+  function openLabelModal(productName: string, existingLabel?: ProductLabel | null, productUrl?: string, language: "cs" | "pl" | "sk" = "cs") {
+    setLabelModal({ open: true, productName, productUrl, isEdit: !!existingLabel, language });
     if (existingLabel) {
       setLabelForm({
         nazev: existingLabel.nazev,
@@ -333,6 +342,19 @@ export default function Home() {
           <div className="flex-1" />
 
           <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Jazyk štítků:</label>
+            <select
+              value={labelLanguage}
+              onChange={(e) => setLabelLanguage(e.target.value as "cs" | "pl" | "sk")}
+              className="border rounded px-2 py-1"
+            >
+              <option value="cs">🇨🇿 Čeština</option>
+              <option value="pl">🇵🇱 Polski</option>
+              <option value="sk">🇸🇰 Slovenčina</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Počáteční pozice:</label>
             <input
               type="number"
@@ -439,7 +461,7 @@ export default function Home() {
                           </span>
                           {item.label ? (
                             <button
-                              onClick={() => openLabelModal(item.productName, item.label, item.productUrl)}
+                              onClick={() => openLabelModal(item.productName, item.label, item.productUrl, "cs")}
                               className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
                             >
                               <Edit2 className="w-3 h-3" />
@@ -447,7 +469,7 @@ export default function Home() {
                             </button>
                           ) : (
                             <button
-                              onClick={() => openLabelModal(item.productName, null, item.productUrl)}
+                              onClick={() => openLabelModal(item.productName, null, item.productUrl, "cs")}
                               className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1"
                             >
                               <Plus className="w-3 h-3" />
@@ -484,6 +506,26 @@ export default function Home() {
             <p className="text-sm text-gray-600 mb-2">
               Produkt: <strong>{labelModal.productName}</strong>
             </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Jazyk štítku</label>
+              <div className="flex gap-2">
+                {(["cs", "pl", "sk"] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => setLabelModal({ ...labelModal, language: lang })}
+                    className={`px-3 py-1.5 rounded text-sm ${
+                      labelModal.language === lang
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {lang === "cs" ? "🇨🇿 CZ" : lang === "pl" ? "🇵🇱 PL" : "🇸🇰 SK"}
+                  </button>
+                ))}
+              </div>
+            </div>
             
             {labelModal.productUrl && !labelModal.isEdit && (
               <button

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const { orderIds, startPosition = 1, excludedItemIds = [] } = await request.json();
+    const { orderIds, startPosition = 1, excludedItemIds = [], language = "cs" } = await request.json();
 
     if (!orderIds || !Array.isArray(orderIds)) {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get orders with items and labels
+    // Get orders with items
     const orders = await prisma.order.findMany({
       where: { id: { in: orderIds } },
       include: {
@@ -25,9 +25,19 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Get all labels for the requested language
+    const allLabels = await prisma.productLabel.findMany({
+      where: { language },
+    });
+
+    // Create a map of productName -> label for quick lookup
+    const labelMap = new Map<string, typeof allLabels[0]>();
+    for (const label of allLabels) {
+      labelMap.set(label.productName, label);
+    }
+
     // Build label requests
     const labelRequests: LabelRequest[] = [];
-    const missingLabels: string[] = [];
 
     for (const order of orders) {
       for (const item of order.items) {
@@ -36,18 +46,29 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Skip items without labels (instead of error)
-        if (!item.label) {
+        // For requested language, look up label by productName
+        // Use the Czech label's productName to find the corresponding label in the target language
+        let label = null;
+        if (language === "cs" && item.label) {
+          // For Czech, use the linked label directly
+          label = item.label;
+        } else if (item.label) {
+          // For other languages, find label with same productName
+          label = labelMap.get(item.label.productName);
+        }
+
+        // Skip items without labels
+        if (!label) {
           continue;
         }
 
         labelRequests.push({
           label: {
-            nazev: item.label.nazev,
-            slozeni: item.label.slozeni,
-            nutricniHodnoty: item.label.nutricniHodnoty,
-            skladovani: item.label.skladovani ?? undefined,
-            vyrobce: item.label.vyrobce,
+            nazev: label.nazev,
+            slozeni: label.slozeni,
+            nutricniHodnoty: label.nutricniHodnoty,
+            skladovani: label.skladovani ?? undefined,
+            vyrobce: label.vyrobce,
           },
           quantity: item.quantity,
         });
@@ -61,8 +82,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Generating PDF with", labelRequests.length, "label requests, startPosition:", startPosition);
-    console.log("Label data:", JSON.stringify(labelRequests, null, 2));
+    console.log("Generating PDF with", labelRequests.length, "label requests, startPosition:", startPosition, "language:", language);
 
     const pdfBytes = await generateLabelsPDF(labelRequests, startPosition);
     console.log("PDF generated, size:", pdfBytes.length, "bytes");
@@ -70,7 +90,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="labels-${Date.now()}.pdf"`,
+        "Content-Disposition": `attachment; filename="labels-${language}-${Date.now()}.pdf"`,
       },
     });
   } catch (error) {
