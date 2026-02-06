@@ -482,7 +482,12 @@ export async function POST(request: NextRequest) {
       try {
         // Try to find existing label
         const existing = await prisma.productLabel.findUnique({
-          where: { productName: label.productName },
+          where: { 
+            productName_language: {
+              productName: label.productName,
+              language: "cs"
+            }
+          },
         });
 
         let labelId: string;
@@ -502,7 +507,7 @@ export async function POST(request: NextRequest) {
           results.updated++;
         } else {
           const newLabel = await prisma.productLabel.create({
-            data: label,
+            data: { ...label, language: "cs" },
           });
           labelId = newLabel.id;
           results.created++;
