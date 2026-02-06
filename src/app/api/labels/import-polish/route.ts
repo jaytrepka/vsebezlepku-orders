@@ -58,89 +58,103 @@ async function fetchFullDocument(): Promise<string> {
 function extractPolishLabels(text: string): ParsedPolishLabel[] {
   const labels: ParsedPolishLabel[] = [];
   
-  // Split by tabs/newlines to find product blocks
-  // Look for pattern: CODE\n\tPRODUCT_NAME\n\tSkładniki:...
-  const blocks = text.split(/\n\s*\n+/);
+  // Split by tabs to find blocks - the document uses tabs as separators
+  // Each block starts with a code like "D060" or "CO10"
+  const codePattern = /^[A-Z][A-Z0-9]{2,4}$/;
   
-  for (const block of blocks) {
-    // Check if block contains Polish ingredients
-    if (!block.includes("Składniki:")) continue;
+  // Find all positions of "Składniki:" and work backwards/forwards to extract
+  const skladnikiMatches = [...text.matchAll(/Składniki:\s*([^\n]+)/gi)];
+  
+  for (const match of skladnikiMatches) {
+    const matchPos = match.index || 0;
     
-    const lines = block.split('\n').map(l => l.replace(/^\t+/, '').trim()).filter(l => l);
+    // Look backwards to find the product name and code
+    const textBefore = text.substring(Math.max(0, matchPos - 500), matchPos);
+    const linesBefore = textBefore.split('\n').map(l => l.replace(/^\t+/, '').trim()).filter(l => l);
     
-    let code = "";
+    // Find product name (last substantial line before Składniki)
     let productName = "";
-    let skladniki = "";
+    let code = "";
+    
+    for (let i = linesBefore.length - 1; i >= 0; i--) {
+      const line = linesBefore[i];
+      
+      // Skip empty lines and storage instructions
+      if (!line || line.startsWith("Producent") || line.startsWith("Přechow") || line.startsWith("Przechow")) continue;
+      
+      // Check if it's a product code
+      if (codePattern.test(line)) {
+        code = line;
+        break;
+      }
+      
+      // If no product name yet and this looks like one
+      if (!productName && line.length > 5 && line.length < 150) {
+        // Skip if it's part of previous label content
+        if (line.includes("Tłuszcze") || line.includes("Węglowodany") || line.includes("Wartość")) continue;
+        if (line.includes("Složení") || line.includes("Nutriční") || line.includes("Výrobce")) continue;
+        productName = line;
+      }
+    }
+    
+    if (!productName) continue;
+    
+    // Extract ingredients
+    let skladniki = match[1];
+    
+    // Look forward to get continuation of ingredients and nutritional values
+    const textAfter = text.substring(matchPos + match[0].length, matchPos + 2000);
+    const linesAfter = textAfter.split('\n').map(l => l.replace(/^\t+/, '').trim());
+    
     let wartosci = "";
     let producent = "";
-    let inSkladniki = false;
-    let inWartosci = false;
+    let inSkladniki = true;
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    for (const line of linesAfter) {
+      if (!line) continue;
       
-      // Product code (e.g., D060, CO10, S038)
-      if (line.match(/^[A-Z][A-Z0-9]{2,4}$/) && !code) {
-        code = line;
-        continue;
-      }
-      
-      // Product name (line after code, or first uppercase line with product info)
-      if (!productName && code && !line.startsWith("Składniki")) {
-        productName = line;
-        continue;
-      }
-      
-      // Ingredients
-      if (line.startsWith("Składniki:")) {
-        inSkladniki = true;
-        inWartosci = false;
-        skladniki = line.replace("Składniki:", "").trim();
-        continue;
-      }
-      
-      // Nutritional values
       if (line.startsWith("Wartości odżywcze") || line.startsWith("Wartość energetyczna")) {
         inSkladniki = false;
-        inWartosci = true;
         if (line.includes("Wartość energetyczna")) {
           wartosci = line;
         }
         continue;
       }
       
-      // Producer
       if (line.startsWith("Producent:")) {
-        inSkladniki = false;
-        inWartosci = false;
         producent = line.replace("Producent:", "").trim();
+        break;
+      }
+      
+      if (line.startsWith("Przechowywać") || line.startsWith("Minimalny")) {
         continue;
       }
       
-      // Skip storage info
-      if (line.startsWith("Przechowywać") || line.startsWith("Minimalny okres")) {
-        inSkladniki = false;
-        inWartosci = false;
-        continue;
+      // Check if we hit the next product (a code)
+      if (codePattern.test(line)) {
+        break;
       }
       
-      // Continue collecting based on state
-      if (inSkladniki && !line.startsWith("Wartości") && !line.startsWith("Producent")) {
-        skladniki += " " + line;
-      } else if (inWartosci && !line.startsWith("Producent") && !line.startsWith("Przechowywać")) {
-        wartosci += " " + line;
+      if (inSkladniki) {
+        // Continue ingredients if not hitting another section
+        if (!line.startsWith("Wartości") && !line.startsWith("Nutriční")) {
+          skladniki += " " + line;
+        }
+      } else if (wartosci) {
+        // Continue nutritional values
+        if (line.match(/^Tłuszcze|^Węglowodany|^Błonnik|^Białko|^Sól|^\d+\s*kJ/)) {
+          wartosci += " " + line;
+        }
       }
     }
     
-    if (productName && skladniki) {
-      labels.push({
-        code,
-        polishName: productName.trim(),
-        skladniki: skladniki.trim(),
-        wartosciOdzywcze: wartosci.trim(),
-        producent: producent || "Piaceri Mediterranei – Włochy",
-      });
-    }
+    labels.push({
+      code,
+      polishName: productName.trim(),
+      skladniki: skladniki.replace(/\s+/g, ' ').trim(),
+      wartosciOdzywcze: wartosci.replace(/\s+/g, ' ').trim(),
+      producent: producent || "Piaceri Mediterranei – Włochy",
+    });
   }
   
   return labels;
