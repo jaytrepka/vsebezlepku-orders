@@ -261,11 +261,11 @@ function findOptimalFontSize(
   for (let size = maxSize; size >= minSize; size -= 0.25) {
     const lineHeight = size * 1.15;
     const titleLineHeight = (size + 1) * 1.15;
-    const separatorHeight = 4; // 2px before + 2px after each separator line
+    const separatorHeight = 3; // spacing around separator lines
     
     // Calculate title lines
     const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
-    let totalHeight = titleLines.length * titleLineHeight + 3; // title + separator space
+    let totalHeight = titleLines.length * titleLineHeight + separatorHeight; // title + separator
     
     // Složení section (use plain text for height calc, bold doesn't change line count much)
     const slozeniPlain = "Složení: " + label.slozeni.replace(/\*\*/g, '');
@@ -323,17 +323,28 @@ function drawLabel(
   });
   
   // Find optimal font size (use most of available height)
-  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 4, font, fontBold);
+  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 2, font, fontBold);
   const lineHeight = fontSize * 1.15;
   const titleSize = fontSize + 1;
   const titleLineHeight = titleSize * 1.15;
   
-  let currentY = y + LABEL_HEIGHT - padding - 2;
+  let currentY = y + LABEL_HEIGHT - padding - 1;
   const textX = x + padding + 2;
   const maxTextWidth = contentWidth - 4;
   
-  // === NÁZEV (title, bold, centered) ===
+  // === NÁZEV (title, bold, centered, with grey background) ===
   const titleLines = wrapTextWithFont(label.nazev, maxTextWidth, titleSize, fontBold);
+  const titleBlockHeight = titleLines.length * titleLineHeight + 2;
+  
+  // Draw grey background for title
+  page.drawRectangle({
+    x: x + padding,
+    y: currentY - titleBlockHeight,
+    width: LABEL_WIDTH - 2 * padding,
+    height: titleBlockHeight,
+    color: rgb(0.92, 0.92, 0.92),
+  });
+  
   for (const line of titleLines) {
     currentY -= titleLineHeight;
     const lineWidth = fontBold.widthOfTextAtSize(line, titleSize);
@@ -354,7 +365,7 @@ function drawLabel(
     color: borderColor,
     thickness: 0.3,
   });
-  currentY -= 2;
+  currentY -= 1;
   
   // === SLOŽENÍ (with bold support) ===
   const slozeniText = "Složení: " + label.slozeni;
