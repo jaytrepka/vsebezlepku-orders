@@ -5,6 +5,7 @@ import { Package, Mail, FileText, Plus, Trash2, Printer, Edit2 } from "lucide-re
 
 interface ProductLabel {
   id: string;
+  productName: string;
   nazev: string;
   slozeni: string;
   nutricniHodnoty: string;
@@ -54,6 +55,7 @@ export default function Home() {
   const [fetchingProductInfo, setFetchingProductInfo] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk">("cs");
+  const [languageLabels, setLanguageLabels] = useState<Map<string, ProductLabel>>(new Map());
 
   const languageNames = {
     cs: "Čeština",
@@ -61,17 +63,50 @@ export default function Home() {
     sk: "Slovenčina",
   };
 
-  // Calculate total items to print (from selected orders, excluding unchecked items and items without labels)
+  // Get label for product in selected language
+  function getLabelForProduct(item: OrderItem): ProductLabel | null {
+    if (labelLanguage === "cs") {
+      return item.label || null;
+    }
+    // For other languages, look up by Czech label's productName
+    if (item.label) {
+      return languageLabels.get(item.label.productName) || null;
+    }
+    return null;
+  }
+
+  // Calculate total items to print (from selected orders, excluding unchecked items and items without labels in selected language)
   const itemsToPrint = orders
     .filter((o) => selectedOrders.includes(o.id))
     .flatMap((o) => o.items)
-    .filter((item) => !excludedItems.includes(item.id) && item.label)
+    .filter((item) => !excludedItems.includes(item.id) && getLabelForProduct(item))
     .reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     checkAuth();
     fetchOrders();
   }, []);
+
+  // Fetch labels for selected language (non-Czech)
+  useEffect(() => {
+    if (labelLanguage !== "cs") {
+      fetchLanguageLabels();
+    } else {
+      setLanguageLabels(new Map());
+    }
+  }, [labelLanguage]);
+
+  async function fetchLanguageLabels() {
+    const res = await fetch(`/api/labels?language=${labelLanguage}`);
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      const map = new Map<string, ProductLabel>();
+      for (const label of data) {
+        map.set(label.productName, label);
+      }
+      setLanguageLabels(map);
+    }
+  }
 
   async function checkAuth() {
     const res = await fetch("/api/gmail");
@@ -459,23 +494,57 @@ export default function Home() {
                           <span className="truncate max-w-xs">
                             {item.productName}
                           </span>
-                          {item.label ? (
-                            <button
-                              onClick={() => openLabelModal(item.productName, item.label, item.productUrl, "cs")}
-                              className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                              Štítek ✓
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => openLabelModal(item.productName, null, item.productUrl, "cs")}
-                              className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Přidat štítek
-                            </button>
-                          )}
+                          {(() => {
+                            const langLabel = getLabelForProduct(item);
+                            const hasCzechLabel = !!item.label;
+                            
+                            if (labelLanguage === "cs") {
+                              // Czech: show edit if has label, add if not
+                              return hasCzechLabel ? (
+                                <button
+                                  onClick={() => openLabelModal(item.productName, item.label, item.productUrl, "cs")}
+                                  className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  Štítek ✓
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => openLabelModal(item.productName, null, item.productUrl, "cs")}
+                                  className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Přidat štítek
+                                </button>
+                              );
+                            } else {
+                              // Other language: need Czech label first, then show translation status
+                              if (!hasCzechLabel) {
+                                return (
+                                  <span className="text-xs text-gray-400 px-2 py-0.5">
+                                    (chybí CZ štítek)
+                                  </span>
+                                );
+                              }
+                              return langLabel ? (
+                                <button
+                                  onClick={() => openLabelModal(item.label!.productName, langLabel, item.productUrl, labelLanguage)}
+                                  className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  {labelLanguage.toUpperCase()} ✓
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => openLabelModal(item.label!.productName, null, item.productUrl, labelLanguage)}
+                                  className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Přidat {labelLanguage.toUpperCase()}
+                                </button>
+                              );
+                            }
+                          })()}
                         </div>
                       ))}
                     </div>
