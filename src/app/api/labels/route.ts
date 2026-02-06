@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// Helper to normalize product name for matching (removes " - Pomozte neplýtvat" suffix)
+function normalizeProductName(name: string): string {
+  return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").trim();
+}
+
 export async function GET() {
   try {
     const labels = await prisma.productLabel.findMany({
@@ -45,6 +50,27 @@ export async function POST(request: NextRequest) {
       where: { productName: data.productName },
       data: { labelId: label.id },
     });
+
+    // Also link to items with " - Pomozte neplýtvat" suffix
+    const normalizedName = normalizeProductName(data.productName);
+    if (normalizedName === data.productName) {
+      // Original name has no suffix, so look for items WITH the suffix
+      const itemsWithSuffix = await prisma.orderItem.findMany({
+        where: {
+          labelId: null,
+          productName: { contains: normalizedName },
+        },
+      });
+      
+      for (const item of itemsWithSuffix) {
+        if (normalizeProductName(item.productName) === normalizedName) {
+          await prisma.orderItem.update({
+            where: { id: item.id },
+            data: { labelId: label.id },
+          });
+        }
+      }
+    }
 
     return NextResponse.json(label);
   } catch (error) {
