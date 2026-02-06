@@ -113,11 +113,31 @@ async function fetchHtmlDocument(): Promise<string> {
   }
   let html = await response.text();
   
-  // Convert <b> and <strong> tags to **text** markers
-  // Also handle <span style="font-weight:700"> or similar
+  // Extract CSS to find which classes have font-weight:700 (bold)
+  const boldClasses = new Set<string>();
+  const cssMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  if (cssMatch) {
+    const css = cssMatch[1];
+    // Find all class definitions with font-weight:700 or font-weight:bold
+    const classPattern = /\.([a-z0-9]+)\{[^}]*font-weight:\s*(700|bold)[^}]*\}/gi;
+    let match;
+    while ((match = classPattern.exec(css)) !== null) {
+      boldClasses.add(match[1]);
+    }
+  }
+  
+  // Convert spans with bold classes to **text** markers
+  // Build a regex pattern for all bold classes
+  if (boldClasses.size > 0) {
+    const classNames = Array.from(boldClasses).join('|');
+    // Match spans that include any of the bold classes
+    const spanPattern = new RegExp(`<span[^>]*class="[^"]*\\b(${classNames})\\b[^"]*"[^>]*>([^<]*)<\\/span>`, 'gi');
+    html = html.replace(spanPattern, '**$2**');
+  }
+  
+  // Also handle <b> and <strong> tags
   html = html.replace(/<b\b[^>]*>([^<]*)<\/b>/gi, '**$1**');
   html = html.replace(/<strong\b[^>]*>([^<]*)<\/strong>/gi, '**$1**');
-  html = html.replace(/<span[^>]*font-weight:\s*(bold|700|800|900)[^>]*>([^<]*)<\/span>/gi, '**$2**');
   
   // Remove all other HTML tags
   html = html.replace(/<[^>]+>/g, ' ');
@@ -129,6 +149,21 @@ async function fetchHtmlDocument(): Promise<string> {
   html = html.replace(/&gt;/g, '>');
   html = html.replace(/&quot;/g, '"');
   html = html.replace(/&#39;/g, "'");
+  html = html.replace(/&[a-z]+;/gi, (match) => {
+    const entities: Record<string, string> = {
+      '&aacute;': 'á', '&eacute;': 'é', '&iacute;': 'í', '&oacute;': 'ó', '&uacute;': 'ú',
+      '&Aacute;': 'Á', '&Eacute;': 'É', '&Iacute;': 'Í', '&Oacute;': 'Ó', '&Uacute;': 'Ú',
+      '&scaron;': 'š', '&Scaron;': 'Š', '&ccaron;': 'č', '&Ccaron;': 'Č',
+      '&zcaron;': 'ž', '&Zcaron;': 'Ž', '&rcaron;': 'ř', '&Rcaron;': 'Ř',
+      '&yacute;': 'ý', '&Yacute;': 'Ý', '&uuml;': 'ü', '&Uuml;': 'Ü',
+      '&ndash;': '–', '&mdash;': '—', '&deg;': '°',
+    };
+    return entities[match] || match;
+  });
+  html = html.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)));
+  
+  // Merge adjacent bold markers
+  html = html.replace(/\*\*\s*\*\*/g, ' ');
   
   // Normalize whitespace but preserve **markers**
   html = html.replace(/\s+/g, ' ');
@@ -363,6 +398,7 @@ export async function POST(request: Request) {
     // Check if we should use HTML version (for bold allergens)
     const url = new URL(request.url);
     const useHtml = url.searchParams.get('html') === 'true';
+    const forceUpdate = url.searchParams.get('update') === 'true';
     
     let polishLabels: ParsedPolishLabel[];
     
@@ -388,6 +424,7 @@ export async function POST(request: Request) {
       found: polishLabels.length,
       matched: 0,
       created: 0,
+      updated: 0,
       alreadyExists: 0,
       czechNotFound: 0,
       errors: [] as string[],
@@ -424,7 +461,23 @@ export async function POST(request: Request) {
       });
       
       if (existingPl) {
-        results.alreadyExists++;
+        // If forceUpdate is true and we have bold markers, update the label
+        if (forceUpdate && plLabel.skladniki.includes('**')) {
+          try {
+            await prisma.productLabel.update({
+              where: { id: existingPl.id },
+              data: {
+                slozeni: plLabel.skladniki,
+                nutricniHodnoty: plLabel.wartosciOdzywcze || existingPl.nutricniHodnoty,
+              },
+            });
+            results.updated++;
+          } catch (err) {
+            results.errors.push(`Failed to update PL label for ${czechProductName}: ${err}`);
+          }
+        } else {
+          results.alreadyExists++;
+        }
         continue;
       }
       
