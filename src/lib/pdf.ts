@@ -256,7 +256,7 @@ function findOptimalFontSize(
   fontBold: PDFFont
 ): number {
   const minSize = 3;
-  const maxSize = 12;
+  const maxSize = 14;
   
   for (let size = maxSize; size >= minSize; size -= 0.25) {
     const lineHeight = size * 1.15;
@@ -322,8 +322,8 @@ function drawLabel(
     color: rgb(1, 1, 1),
   });
   
-  // Find optimal font size (subtract extra padding for bottom margin)
-  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 8, font, fontBold);
+  // Find optimal font size (use most of available height)
+  const fontSize = findOptimalFontSize(label, contentWidth - 4, contentHeight - 4, font, fontBold);
   const lineHeight = fontSize * 1.15;
   const titleSize = fontSize + 1;
   const titleLineHeight = titleSize * 1.15;
