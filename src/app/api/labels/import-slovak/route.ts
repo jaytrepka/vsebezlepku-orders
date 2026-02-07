@@ -236,6 +236,57 @@ function transferBoldAllergens(slovakText: string, czechText: string): string {
   // Clean up any double bold markers
   result = result.replace(/\*\*\*\*+/g, '**');
   
+  // Extend any partial bold to full words
+  result = extendBoldToFullWords(result);
+  
+  return result;
+}
+
+// Function to extend partial bold markers to full words
+// e.g., "soj**ová**" -> "**sojová**", "orech**ov**" -> "**orechov**"
+function extendBoldToFullWords(text: string): string {
+  // Slovak/Czech word characters including diacritics
+  const wordChar = '[a-zA-ZáäčďéěíĺľňóôŕšťúůýžÁÄČĎÉĚÍĹĽŇÓÔŔŠŤÚŮÝŽ]';
+  
+  // First, handle cases where bold starts in middle of word: prefix**bold** -> **prefixbold**
+  let result = text.replace(
+    new RegExp(`(${wordChar}+)(\\*\\*${wordChar}+\\*\\*)`, 'g'),
+    (match, prefix, boldPart) => {
+      const boldContent = boldPart.replace(/\*\*/g, '');
+      return `**${prefix}${boldContent}**`;
+    }
+  );
+  
+  // Then, handle cases where bold ends in middle of word: **bold**suffix -> **boldsuffix**
+  result = result.replace(
+    new RegExp(`(\\*\\*${wordChar}+\\*\\*)(${wordChar}+)`, 'g'),
+    (match, boldPart, suffix) => {
+      const boldContent = boldPart.replace(/\*\*/g, '');
+      return `**${boldContent}${suffix}**`;
+    }
+  );
+  
+  // Run multiple passes to catch nested cases
+  for (let i = 0; i < 3; i++) {
+    result = result.replace(
+      new RegExp(`(${wordChar}+)(\\*\\*${wordChar}+\\*\\*)`, 'g'),
+      (match, prefix, boldPart) => {
+        const boldContent = boldPart.replace(/\*\*/g, '');
+        return `**${prefix}${boldContent}**`;
+      }
+    );
+    result = result.replace(
+      new RegExp(`(\\*\\*${wordChar}+\\*\\*)(${wordChar}+)`, 'g'),
+      (match, boldPart, suffix) => {
+        const boldContent = boldPart.replace(/\*\*/g, '');
+        return `**${boldContent}${suffix}**`;
+      }
+    );
+  }
+  
+  // Merge adjacent bold markers
+  result = result.replace(/\*\*\*\*/g, '');
+  
   return result;
 }
 

@@ -4,6 +4,58 @@ import { prisma } from "@/lib/prisma";
 const DOC_URL_HTML = "https://docs.google.com/document/d/1WeddfeCuDqLcauAVxWjVO99iu_2t32riFLzr1gajrkE/export?format=html";
 const DOC_URL_TXT = "https://docs.google.com/document/d/1WeddfeCuDqLcauAVxWjVO99iu_2t32riFLzr1gajrkE/export?format=txt";
 
+// Function to extend partial bold markers to full words
+// e.g., "soj**owa**" -> "**sojowa**", "orz**echów**" -> "**orzechów**"
+function extendBoldToFullWords(text: string): string {
+  // Polish word characters including diacritics
+  const wordChar = '[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]';
+  
+  // First, handle cases where bold starts in middle of word: prefix**bold** -> **prefixbold**
+  // Match: word-chars followed by **word-chars**
+  let result = text.replace(
+    new RegExp(`(${wordChar}+)(\\*\\*${wordChar}+\\*\\*)`, 'g'),
+    (match, prefix, boldPart) => {
+      const boldContent = boldPart.replace(/\*\*/g, '');
+      return `**${prefix}${boldContent}**`;
+    }
+  );
+  
+  // Then, handle cases where bold ends in middle of word: **bold**suffix -> **boldsuffix**
+  // Match: **word-chars** followed by word-chars
+  result = result.replace(
+    new RegExp(`(\\*\\*${wordChar}+\\*\\*)(${wordChar}+)`, 'g'),
+    (match, boldPart, suffix) => {
+      const boldContent = boldPart.replace(/\*\*/g, '');
+      return `**${boldContent}${suffix}**`;
+    }
+  );
+  
+  // Handle complex case: prefix**middle**suffix -> **prefixmiddlesuffix**
+  // Run multiple passes to catch nested cases
+  for (let i = 0; i < 3; i++) {
+    result = result.replace(
+      new RegExp(`(${wordChar}+)(\\*\\*${wordChar}+\\*\\*)`, 'g'),
+      (match, prefix, boldPart) => {
+        const boldContent = boldPart.replace(/\*\*/g, '');
+        return `**${prefix}${boldContent}**`;
+      }
+    );
+    result = result.replace(
+      new RegExp(`(\\*\\*${wordChar}+\\*\\*)(${wordChar}+)`, 'g'),
+      (match, boldPart, suffix) => {
+        const boldContent = boldPart.replace(/\*\*/g, '');
+        return `**${boldContent}${suffix}**`;
+      }
+    );
+  }
+  
+  // Merge adjacent bold markers: **word1** **word2** stays separate (different words)
+  // But **part1****part2** -> **part1part2** (same word)
+  result = result.replace(/\*\*\*\*/g, '');
+  
+  return result;
+}
+
 interface ParsedPolishLabel {
   code: string;
   polishName: string;
@@ -253,6 +305,9 @@ function extractPolishLabelsFromHtml(text: string): ParsedPolishLabel[] {
     skladniki = skladniki.replace(/^\*\*\s*/, '').replace(/\s*\*\*$/, '');
     // Fix empty bold markers
     skladniki = skladniki.replace(/\*\*\s*\*\*/g, '');
+    
+    // Fix partial bold words - extend bold to cover entire words
+    skladniki = extendBoldToFullWords(skladniki);
     
     // Skip if skladniki is too short
     if (skladniki.length < 10) continue;
