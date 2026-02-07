@@ -155,18 +155,20 @@ async function fetchTextDocument(): Promise<string> {
 // Czech to Slovak allergen translation map
 const allergenTranslations: Record<string, string[]> = {
   // Czech allergen -> Slovak equivalents (all forms)
-  'vejce': ['vajcia', 'vajce', 'vajec', 'vaječný', 'vaječné', 'vaječná', 'vaječných', 'vaječnom'],
+  'vejce': ['vajcia', 'vajce', 'vajec', 'vaječný', 'vaječné', 'vaječná', 'vaječných', 'vaječnom', 'vajíčka'],
   'vaječný': ['vaječný', 'vaječné', 'vaječná', 'vaječných', 'vaječnom'],
   'mléko': ['mlieko', 'mlieka', 'mliečny', 'mliečna', 'mliečne', 'mliečnych', 'mliečneho'],
   'mléčný': ['mliečny', 'mliečna', 'mliečne', 'mliečnych', 'mliečneho', 'mliečnej'],
-  'ořechy': ['orechy', 'orechov', 'orech', 'orechový', 'orechová', 'orechové', 'orechových'],
-  'ořech': ['orech', 'orechy', 'orechov', 'orechový', 'orechová', 'orechové'],
-  'lískové ořechy': ['lieskové orechy', 'lieskovoorieškový', 'lieskovoorieškové', 'lieskovoorieškových', 'lieskovými orechmi'],
+  'ořechy': ['orechy', 'orechov', 'orech', 'orechový', 'orechová', 'orechové', 'orechových', 'oriešky', 'orieškov'],
+  'ořech': ['orech', 'orechy', 'orechov', 'orechový', 'orechová', 'orechové', 'oriešok', 'oriešky'],
+  'oříšky': ['oriešky', 'orieškov', 'oriešok', 'orechy', 'orechov'],
+  'lískové ořechy': ['lieskové orechy', 'lieskovoorieškový', 'lieskovoorieškové', 'lieskovoorieškových', 'lieskovými orechmi', 'lieskové oriešky'],
   'mandle': ['mandle', 'mandlí', 'mandľový', 'mandľová', 'mandľové', 'mandľových', 'mandliach'],
-  'sója': ['sója', 'sóji', 'sójový', 'sójová', 'sójové', 'sójových', 'sójou'],
+  'sója': ['sója', 'sóji', 'sójový', 'sójová', 'sójové', 'sójových', 'sójou', 'sóju'],
   'sójový': ['sójový', 'sójová', 'sójové', 'sójových', 'sójou'],
+  'sóju': ['sóju', 'sója', 'sóji', 'sójou'],
   'sezam': ['sezam', 'sezamu', 'sezamový', 'sezamová', 'sezamové', 'sezamových', 'sezamovými'],
-  'sezamový': ['sezamový', 'sezamová', 'sezamové', 'sezamových', 'sezamovými'],
+  'sezamový': ['sezamový', 'sezamová', 'sezamové', 'sezamových', 'sezamovými', 'sezamových'],
   'lepek': ['lepok', 'lepku', 'lepkový', 'lepková', 'lepkové'],
   'pšenice': ['pšenica', 'pšenice', 'pšeničný', 'pšeničná', 'pšeničné', 'pšeničných'],
   'oves': ['ovos', 'ovsa', 'ovsený', 'ovsená', 'ovsené', 'ovseným', 'ovsených'],
@@ -177,12 +179,15 @@ const allergenTranslations: Record<string, string[]> = {
   'ryba': ['ryba', 'ryby', 'rýb', 'rybí', 'rybie', 'rybou'],
   'korýši': ['kôrovce', 'kôrovcov'],
   'měkkýši': ['mäkkýše', 'mäkkýšov'],
-  'hořčice': ['horčica', 'horčice', 'horčičný', 'horčičná', 'horčičné'],
+  'hořčice': ['horčica', 'horčice', 'horčičný', 'horčičná', 'horčičné', 'horčicu'],
+  'hořčici': ['horčicu', 'horčica', 'horčice'],
   'celer': ['zeler', 'zeleru', 'zelerový', 'zelerová', 'zelerové'],
   'vlčí bob': ['vlčí bôb', 'vlčieho bôbu', 'lupina', 'lupinový', 'lupinová', 'lupinové', 'lupinovou'],
   'lupina': ['lupina', 'lupinový', 'lupinová', 'lupinové', 'lupinovou', 'lupinových'],
+  'lupinová': ['lupinová', 'lupinový', 'lupinové', 'lupinovou', 'lupinových'],
   'arašídy': ['arašidy', 'arašidov', 'arašidový', 'arašidová', 'arašidové'],
-  'kakao': ['kakao', 'kakaa', 'kakaový', 'kakaová', 'kakaové', 'kakaovým'],
+  'kakao': ['kakao', 'kakaa', 'kakaový', 'kakaová', 'kakaové', 'kakaovým', 'kakaové'],
+  'kakaové': ['kakaové', 'kakaový', 'kakaová', 'kakaovým'],
   'lecithin': ['lecitín', 'lecitínu', 'lecitínový', 'lecitínová'],
   'lecitin': ['lecitín', 'lecitínu', 'lecitínový', 'lecitínová'],
   'smetana': ['smotana', 'smotany', 'smotanový', 'smotanová', 'smotanové'],
@@ -192,8 +197,7 @@ const allergenTranslations: Record<string, string[]> = {
   // Common simple forms
   'vajec': ['vajec', 'vajcia', 'vajce'],
   'mléka': ['mlieka', 'mlieko'],
-  'ořechů': ['orechov', 'orechy'],
-  'sóju': ['sóju', 'sója'],
+  'ořechů': ['orechov', 'orechy', 'orieškov', 'oriešky'],
 };
 
 // Extract bold allergens from Czech text and apply to Slovak text
@@ -218,9 +222,11 @@ function transferBoldAllergens(slovakText: string, czechText: string): string {
     for (const [csKey, skVariants] of Object.entries(allergenTranslations)) {
       if (czechWord.includes(csKey.toLowerCase()) || csKey.toLowerCase().includes(czechWord)) {
         for (const skWord of skVariants) {
-          // Match the Slovak word with word boundaries (accounting for Slovak diacritics)
+          // Match the Slovak word - use lookahead/lookbehind for word boundaries
+          // that work with Slovak diacritics
           const escapedSk = skWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const skRegex = new RegExp(`(?<!\\*\\*)\\b(${escapedSk})\\b(?!\\*\\*)`, 'gi');
+          // Match word not already bolded, with space/punctuation boundaries
+          const skRegex = new RegExp(`(?<!\\*\\*|[a-záäčďéěíĺľňóôŕšťúůýžA-ZÁÄČĎÉĚÍĹĽŇÓÔŔŠŤÚŮÝŽ])(${escapedSk})(?![a-záäčďéěíĺľňóôŕšťúůýžA-ZÁÄČĎÉĚÍĹĽŇÓÔŔŠŤÚŮÝŽ]|\\*\\*)`, 'gi');
           result = result.replace(skRegex, '**$1**');
         }
       }
