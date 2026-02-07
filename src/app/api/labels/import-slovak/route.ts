@@ -152,6 +152,87 @@ async function fetchTextDocument(): Promise<string> {
   return await response.text();
 }
 
+// Czech to Slovak allergen translation map
+const allergenTranslations: Record<string, string[]> = {
+  // Czech allergen -> Slovak equivalents (all forms)
+  'vejce': ['vajcia', 'vajce', 'vajec', 'vaječný', 'vaječné', 'vaječná', 'vaječných', 'vaječnom'],
+  'vaječný': ['vaječný', 'vaječné', 'vaječná', 'vaječných', 'vaječnom'],
+  'mléko': ['mlieko', 'mlieka', 'mliečny', 'mliečna', 'mliečne', 'mliečnych', 'mliečneho'],
+  'mléčný': ['mliečny', 'mliečna', 'mliečne', 'mliečnych', 'mliečneho', 'mliečnej'],
+  'ořechy': ['orechy', 'orechov', 'orech', 'orechový', 'orechová', 'orechové', 'orechových'],
+  'ořech': ['orech', 'orechy', 'orechov', 'orechový', 'orechová', 'orechové'],
+  'lískové ořechy': ['lieskové orechy', 'lieskovoorieškový', 'lieskovoorieškové', 'lieskovoorieškových', 'lieskovými orechmi'],
+  'mandle': ['mandle', 'mandlí', 'mandľový', 'mandľová', 'mandľové', 'mandľových', 'mandliach'],
+  'sója': ['sója', 'sóji', 'sójový', 'sójová', 'sójové', 'sójových', 'sójou'],
+  'sójový': ['sójový', 'sójová', 'sójové', 'sójových', 'sójou'],
+  'sezam': ['sezam', 'sezamu', 'sezamový', 'sezamová', 'sezamové', 'sezamových', 'sezamovými'],
+  'sezamový': ['sezamový', 'sezamová', 'sezamové', 'sezamových', 'sezamovými'],
+  'lepek': ['lepok', 'lepku', 'lepkový', 'lepková', 'lepkové'],
+  'pšenice': ['pšenica', 'pšenice', 'pšeničný', 'pšeničná', 'pšeničné', 'pšeničných'],
+  'oves': ['ovos', 'ovsa', 'ovsený', 'ovsená', 'ovsené', 'ovseným', 'ovsených'],
+  'ječmen': ['jačmeň', 'jačmeňa', 'jačmenný', 'jačmenná', 'jačmenné'],
+  'žito': ['raž', 'raži', 'ražný', 'ražná', 'ražné'],
+  'máslo': ['maslo', 'masla', 'maslový', 'maslová', 'maslové', 'maslom'],
+  'maslo': ['maslo', 'masla', 'maslový', 'maslová', 'maslové', 'maslom'],
+  'ryba': ['ryba', 'ryby', 'rýb', 'rybí', 'rybie', 'rybou'],
+  'korýši': ['kôrovce', 'kôrovcov'],
+  'měkkýši': ['mäkkýše', 'mäkkýšov'],
+  'hořčice': ['horčica', 'horčice', 'horčičný', 'horčičná', 'horčičné'],
+  'celer': ['zeler', 'zeleru', 'zelerový', 'zelerová', 'zelerové'],
+  'vlčí bob': ['vlčí bôb', 'vlčieho bôbu', 'lupina', 'lupinový', 'lupinová', 'lupinové', 'lupinovou'],
+  'lupina': ['lupina', 'lupinový', 'lupinová', 'lupinové', 'lupinovou', 'lupinových'],
+  'arašídy': ['arašidy', 'arašidov', 'arašidový', 'arašidová', 'arašidové'],
+  'kakao': ['kakao', 'kakaa', 'kakaový', 'kakaová', 'kakaové', 'kakaovým'],
+  'lecithin': ['lecitín', 'lecitínu', 'lecitínový', 'lecitínová'],
+  'lecitin': ['lecitín', 'lecitínu', 'lecitínový', 'lecitínová'],
+  'smetana': ['smotana', 'smotany', 'smotanový', 'smotanová', 'smotanové'],
+  'bílek': ['bielok', 'bielka', 'bielkový', 'bielková'],
+  'bílkoviny': ['bielkoviny', 'bielkovín', 'bielkovinový', 'bielkovinová'],
+  'pistácie': ['pistácie', 'pistácií', 'pistáciový', 'pistáciová', 'pistáciové', 'pistáciových'],
+  // Common simple forms
+  'vajec': ['vajec', 'vajcia', 'vajce'],
+  'mléka': ['mlieka', 'mlieko'],
+  'ořechů': ['orechov', 'orechy'],
+  'sóju': ['sóju', 'sója'],
+};
+
+// Extract bold allergens from Czech text and apply to Slovak text
+function transferBoldAllergens(slovakText: string, czechText: string): string {
+  if (!czechText) return slovakText;
+  
+  // Extract bolded words from Czech text
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  const czechBoldWords: string[] = [];
+  let match;
+  while ((match = boldRegex.exec(czechText)) !== null) {
+    czechBoldWords.push(match[1].toLowerCase());
+  }
+  
+  if (czechBoldWords.length === 0) return slovakText;
+  
+  let result = slovakText;
+  
+  // For each Czech bold word, find and bold Slovak equivalents
+  for (const czechWord of czechBoldWords) {
+    // Check direct translations
+    for (const [csKey, skVariants] of Object.entries(allergenTranslations)) {
+      if (czechWord.includes(csKey.toLowerCase()) || csKey.toLowerCase().includes(czechWord)) {
+        for (const skWord of skVariants) {
+          // Match the Slovak word with word boundaries (accounting for Slovak diacritics)
+          const escapedSk = skWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const skRegex = new RegExp(`(?<!\\*\\*)\\b(${escapedSk})\\b(?!\\*\\*)`, 'gi');
+          result = result.replace(skRegex, '**$1**');
+        }
+      }
+    }
+  }
+  
+  // Clean up any double bold markers
+  result = result.replace(/\*\*\*\*+/g, '**');
+  
+  return result;
+}
+
 function markBoldText(text: string, html: string, boldClasses: string[]): string {
   if (boldClasses.length === 0) return text;
   
@@ -493,6 +574,9 @@ export async function POST(request: Request) {
 
         results.matched++;
 
+        // Transfer bold allergens from Czech label to Slovak ingredients
+        const slovakIngredientsWithBold = transferBoldAllergens(label.ingredients, czechLabel.slozeni);
+
         // Check if Slovak label already exists
         const existingLabel = await prisma.productLabel.findFirst({
           where: {
@@ -507,7 +591,7 @@ export async function POST(request: Request) {
               where: { id: existingLabel.id },
               data: {
                 nazev: label.name,
-                slozeni: label.ingredients,
+                slozeni: slovakIngredientsWithBold,
                 nutricniHodnoty: label.nutritionalValues,
                 skladovani: label.storage,
                 vyrobce: label.producer,
@@ -522,7 +606,7 @@ export async function POST(request: Request) {
             data: {
               productName: czechLabel.productName,
               nazev: label.name,
-              slozeni: label.ingredients,
+              slozeni: slovakIngredientsWithBold,
               nutricniHodnoty: label.nutritionalValues,
               skladovani: label.storage,
               vyrobce: label.producer,
