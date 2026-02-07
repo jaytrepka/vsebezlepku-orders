@@ -282,37 +282,38 @@ function findOptimalFontSize(
   
   for (let size = maxSize; size >= minSize; size -= 0.25) {
     const lineHeight = size * 1.15;
-    const titleLineHeight = (size + 1) * 1.15;
-    const separatorHeight = 3; // spacing around separator lines
+    const titleSize = size + 1;
+    const titleLineHeight = titleSize * 1.15;
+    const separatorHeight = 3; // spacing around separator lines (2 before + 1 after)
     
-    // Calculate title lines
-    const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
-    let totalHeight = titleLines.length * titleLineHeight + separatorHeight; // title + separator
+    // Calculate title lines - uses narrower width like in drawing
+    const titleLines = wrapTextWithFont(label.nazev, contentWidth, titleSize, fontBold);
+    // Title block height includes the +2 padding from drawing code
+    let totalHeight = titleLines.length * titleLineHeight + 2 + separatorHeight;
     
     // Složení section - use wrapTextWithBold for accurate line count
     const slozeniText = headers.slozeni + " " + label.slozeni;
     const slozeniLines = wrapTextWithBold(slozeniText, contentWidth, size, font, fontBold);
     totalHeight += slozeniLines.length * lineHeight + separatorHeight;
     
-    // Nutriční hodnoty section (header may wrap + content)
-    const nutriHeaderWidth = fontBold.widthOfTextAtSize(headers.nutricniHodnoty, size);
-    const nutriHeaderLines = nutriHeaderWidth <= contentWidth ? 1 : Math.ceil(nutriHeaderWidth / contentWidth);
-    totalHeight += nutriHeaderLines * lineHeight;
-    const nutriLines = wrapTextWithFont(label.nutricniHodnoty, contentWidth, size, font);
+    // Nutriční hodnoty section (header + content)
+    const nutriText = headers.nutricniHodnoty + " " + label.nutricniHodnoty;
+    const nutriLines = wrapTextWithFont(nutriText, contentWidth, size, font);
     totalHeight += nutriLines.length * lineHeight + separatorHeight;
     
-    // Info (optional) - no prefix
+    // Info (optional)
     if (label.skladovani) {
       const infoLines = wrapTextWithFont(label.skladovani, contentWidth, size, font);
       totalHeight += infoLines.length * lineHeight + separatorHeight;
     }
     
     // Výrobce
-    const vyrobceLines = wrapTextWithFont(headers.vyrobce + " " + label.vyrobce, contentWidth, size, font);
+    const vyrobceText = headers.vyrobce + " " + label.vyrobce;
+    const vyrobceLines = wrapTextWithFont(vyrobceText, contentWidth, size, font);
     totalHeight += vyrobceLines.length * lineHeight;
     
-    // Add a small buffer to prevent edge cases
-    if (totalHeight + 2 <= availableHeight) {
+    // Add buffer for starting offset (-1 in drawing) and safety margin
+    if (totalHeight + 5 <= availableHeight) {
       return size;
     }
   }
