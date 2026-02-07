@@ -538,16 +538,33 @@ export async function POST(request: Request) {
         let czechLabel = null;
 
         if (czechName) {
-          // Check if Czech label exists for this product
+          // Check if Czech label exists for this product - use exact match first
           czechLabel = await prisma.productLabel.findFirst({
             where: {
-              productName: {
-                contains: czechName.split(' ')[0],
-                mode: 'insensitive',
-              },
+              productName: czechName,
               language: "cs",
             },
           });
+          
+          // If no exact match, try partial match with first meaningful word
+          if (!czechLabel) {
+            // Skip common prefixes like "Piaceri Mediterranei"
+            const words = czechName.split(' ');
+            const searchWord = words.find(w => 
+              w.length > 4 && 
+              !w.toLowerCase().match(/^(piaceri|mediterranei|bezlepkové|bezlepkový|bezlepková)$/)
+            ) || words[0];
+            
+            czechLabel = await prisma.productLabel.findFirst({
+              where: {
+                productName: {
+                  contains: searchWord,
+                  mode: 'insensitive',
+                },
+                language: "cs",
+              },
+            });
+          }
         }
 
         // If no match by name, try matching by nutritional values
