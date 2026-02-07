@@ -80,14 +80,29 @@ async function fetchHtmlDocument(): Promise<{ html: string; boldClasses: string[
   
   if (styleMatch) {
     const cssContent = styleMatch[1];
-    // Find all class definitions with font-weight:700
+    // Find all class definitions with font-weight:700 (handles c2, c11, c17, etc.)
     const classRegex = /\.(c\d+)\s*\{[^}]*font-weight:\s*700[^}]*\}/g;
     let match;
     while ((match = classRegex.exec(cssContent)) !== null) {
       boldClasses.push(match[1]);
     }
+    // Also check for shorthand declarations like .c17{font-weight:700}
+    const shorthandRegex = /\.(c\d+)\s*\{\s*font-weight:\s*700\s*[;}]/g;
+    while ((match = shorthandRegex.exec(cssContent)) !== null) {
+      if (!boldClasses.includes(match[1])) {
+        boldClasses.push(match[1]);
+      }
+    }
+    // Check for combined declarations like .c5{font-size:8pt;font-weight:700}
+    const combinedRegex = /\.(c\d+)\s*\{[^}]*font-weight:\s*700/g;
+    while ((match = combinedRegex.exec(cssContent)) !== null) {
+      if (!boldClasses.includes(match[1])) {
+        boldClasses.push(match[1]);
+      }
+    }
   }
   
+  console.log('Found bold classes:', boldClasses);
   return { html, boldClasses };
 }
 
@@ -334,11 +349,38 @@ export async function POST(request: Request) {
 
     console.log(`Found ${labels.length} Slovak labels to import`);
 
+    // Fetch all Czech labels for nutritional value matching
+    const allCzechLabels = await prisma.productLabel.findMany({
+      where: { language: "cs" },
+    });
+
+    // Helper function to extract numbers from nutritional values for comparison
+    function extractNutritionNumbers(text: string): string[] {
+      if (!text) return [];
+      // Extract all numbers with optional decimals
+      const matches = text.match(/\d+[,.]?\d*/g) || [];
+      return matches.map(n => n.replace(',', '.'));
+    }
+
+    // Helper function to compare nutritional values
+    function nutritionMatch(sk: string, cs: string): boolean {
+      const skNumbers = extractNutritionNumbers(sk);
+      const csNumbers = extractNutritionNumbers(cs);
+      if (skNumbers.length < 3 || csNumbers.length < 3) return false;
+      // Compare first 5 numbers (energy, fat, saturated, carbs, sugars)
+      let matches = 0;
+      for (let i = 0; i < Math.min(5, skNumbers.length, csNumbers.length); i++) {
+        if (skNumbers[i] === csNumbers[i]) matches++;
+      }
+      return matches >= 4; // At least 4 out of 5 numbers must match
+    }
+
     const results = {
       created: 0,
       updated: 0,
       skipped: 0,
       matched: 0,
+      matchedByNutrition: 0,
       errors: [] as string[],
     };
 
@@ -354,31 +396,50 @@ export async function POST(request: Request) {
             sk.toLowerCase().includes(label.name.toLowerCase().split(' ')[0])
           );
           
-          if (!possibleMatch) {
-            results.errors.push(`No Czech match for: ${label.name}`);
-            results.skipped++;
-            continue;
+          if (possibleMatch) {
+            czechName = possibleMatch[1];
           }
-          
-          // Extract Czech name from the found match
-          czechName = possibleMatch[1];
         }
 
-        const productName = czechName;
+        let czechLabel = null;
 
-        // Check if Czech label exists for this product
-        const czechLabel = await prisma.productLabel.findFirst({
-          where: {
-            productName: {
-              contains: productName.split(' ')[0],
-              mode: 'insensitive',
+        if (czechName) {
+          // Check if Czech label exists for this product
+          czechLabel = await prisma.productLabel.findFirst({
+            where: {
+              productName: {
+                contains: czechName.split(' ')[0],
+                mode: 'insensitive',
+              },
+              language: "cs",
             },
-            language: "cs",
-          },
-        });
+          });
+        }
+
+        // If no match by name, try matching by nutritional values
+        if (!czechLabel && label.nutritionalValues) {
+          for (const csLabel of allCzechLabels) {
+            if (nutritionMatch(label.nutritionalValues, csLabel.nutricniHodnoty)) {
+              // Additional check: product names should have some similarity
+              const skWords = label.name.toLowerCase().split(/\s+/);
+              const csWords = csLabel.productName.toLowerCase().split(/\s+/);
+              const hasCommonWord = skWords.some(sw => 
+                csWords.some(cw => sw.length > 3 && cw.length > 3 && 
+                  (sw.includes(cw.substring(0, 4)) || cw.includes(sw.substring(0, 4)))
+                )
+              );
+              if (hasCommonWord) {
+                czechLabel = csLabel;
+                results.matchedByNutrition++;
+                console.log(`Matched by nutrition: "${label.name}" -> "${csLabel.productName}"`);
+                break;
+              }
+            }
+          }
+        }
 
         if (!czechLabel) {
-          results.errors.push(`No Czech label found for: ${productName}`);
+          results.errors.push(`No Czech match for: ${label.name}`);
           results.skipped++;
           continue;
         }
