@@ -289,9 +289,9 @@ function findOptimalFontSize(
     const titleLines = wrapTextWithFont(label.nazev, contentWidth - 4, size + 1, fontBold);
     let totalHeight = titleLines.length * titleLineHeight + separatorHeight; // title + separator
     
-    // Složení section (use plain text for height calc, bold doesn't change line count much)
-    const slozeniPlain = headers.slozeni + " " + label.slozeni.replace(/\*\*/g, '');
-    const slozeniLines = wrapTextWithFont(slozeniPlain, contentWidth, size, font);
+    // Složení section - use wrapTextWithBold for accurate line count
+    const slozeniText = headers.slozeni + " " + label.slozeni;
+    const slozeniLines = wrapTextWithBold(slozeniText, contentWidth, size, font, fontBold);
     totalHeight += slozeniLines.length * lineHeight + separatorHeight;
     
     // Nutriční hodnoty section (header may wrap + content)
@@ -311,7 +311,8 @@ function findOptimalFontSize(
     const vyrobceLines = wrapTextWithFont(headers.vyrobce + " " + label.vyrobce, contentWidth, size, font);
     totalHeight += vyrobceLines.length * lineHeight;
     
-    if (totalHeight <= availableHeight) {
+    // Add a small buffer to prevent edge cases
+    if (totalHeight + 2 <= availableHeight) {
       return size;
     }
   }
