@@ -155,16 +155,20 @@ interface WordToken {
 
 function parseTextToWordTokens(text: string): WordToken[] {
   const tokens: WordToken[] = [];
-  const regex = /\*\*([^*]+)\*\*|([^*\s]+)/g;
-  let match;
   
-  while ((match = regex.exec(text)) !== null) {
-    if (match[1]) {
-      // Bold text (inside **)
-      tokens.push({ text: match[1], bold: true });
-    } else if (match[2]) {
-      // Regular text
-      tokens.push({ text: match[2], bold: false });
+  // Split by ** markers to get alternating non-bold and bold regions
+  const parts = text.split(/\*\*/);
+  
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part) continue;
+    
+    const isBold = i % 2 === 1; // Odd indices are inside ** markers
+    
+    // Split this region into individual words
+    const words = part.split(/\s+/).filter(w => w.length > 0);
+    for (const word of words) {
+      tokens.push({ text: word, bold: isBold });
     }
   }
   
