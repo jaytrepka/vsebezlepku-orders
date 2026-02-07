@@ -10,54 +10,95 @@ const DOC_URL_TXT =
 const slovakToCzechMap: Record<string, string> = {
   "AMARETTI 200g": "AMARETTI 200g",
   "ATTIMI – MASLOVÁ KOLIESKA 200g": "ATTIMI – MÁSLOVÁ KOLEČKA 200g",
+  "ATTIMI LIESKOVOORIEŠKOVÉ KOLÁČIKY 120g": "ATTIMI KŘEHKÉ LÍSKOOŘÍŠKOVÉ KOLÁČKY 120g",
   "BAGETA KLASICKÁ 175g": "BAGETA KLASICKÁ 175g",
   "BAGETA RUSTIKÁLNA 175g": "BAGETA RUSTIKÁLNÍ 175g",
   "BIELE MINI CROISSANT 200g": "BÍLÉ MINI CROISSANTY 200g",
   "BROWNIES 200g": "BROWNIES 200g",
+  "BROWNIES 200 g": "BROWNIES 200g",
+  "BRUSCHETTINE Mediterranee 100 g": "BRUSCHETTINE Mediterranee 100g",
+  "BRUSCHETTINE Mediterranee 100g": "BRUSCHETTINE Mediterranee 100g",
+  "BRUSCHETTINE s paprikou a čili 100g": "BRUSCHETTINE s paprikou a chilli 100g",
+  "BRUŠETÍN s paprikou a chilli 100 g": "BRUSCHETTINE s paprikou a chilli 100g",
+  "CANNELLONI": "CANNELLONI",
   "CANTUCCINI 200g": "CANTUCCINI 200g",
+  "CANTUCCI 200 g": "CANTUCCI 200g",
+  "CANTUCCI 200g": "CANTUCCI 200g",
+  "CEREÁLIA MEDOVEJ KRÚŽKY 300g": "CEREÁLIE MEDOVÉ KROUŽKY 300g",
+  "CEREÁLNE DÚHOVÉ KRÚŽKY 300g": "CEREÁLIE DUHOVÉ KROUŽKY 300g",
+  "CEREÁLNE MEDOVÉ GULIČKY 300g": "CEREÁLIE MEDOVÉ KROUŽKY 300g",
   "CEREÁLNE TYČINKY ČOKOLÁDOVÉ 129g (6ks)": "CEREÁLNÍ TYČINKY ČOKOLÁDOVÉ 129g (6ks)",
   "CEREÁLNE TYČINKY S BRUSNICAMI 129g (6ks)": "CEREÁLNÍ TYČINKY S BRUSINKAMI 129g (6ks)",
   "CIABATTA 200g": "CIABATTA 200g",
-  "CIOCOPUNTA PISTACHIO MINIKORNÚTKY 108g (6ks)": "CIOCOPUNTA PISTACHIO MINICORNETS 108g (6ks)",
+  "CIOCOPUNTA PISTACHIO MINIKORNÚTKY 108g (6ks)": "CIOCOPUNTA PISTÁCIOVÉ MINIKORNOUTKY 108g",
+  "CIOCOMIX MINICOOKIES 200g": "CIOCOMIX MINICOOKIES 200g",
+  "CIOCOMIX TYČINKY (120g)": "Piaceri Mediterranei bezlepkové CIOCOMIX TYČINKY 120g (6ks)",
   "CORNETTI CROISSANTY S ČOKOLÁDOU 250g (5ks)": "CORNETTI S ČOKOLÁDOU 250g (5ks)",
   "CORNETTI CROISSANTY S MARHUĽAMI 250g (5ks)": "CORNETTI S MERUŇKAMI 250g (5ks)",
+  "COUS COUS 375 g": "COUS COUS kukuřičný 375g",
+  "COUS COUS 375g": "COUS COUS kukuřičný 375g",
   "CROSTATINE KAKAOVÉ 200g": "CROSTATINE KAKAOVÉ 200g",
   "CROSTATINE MARHUĽOVÉ 200g": "CROSTATINE MERUŇKOVÉ 200g",
   "CROSTATINE SMOTANOVÉ 200g": "CROSTATINE SMETANOVÉ 200g",
   "CROSTATINE ČOKOLÁDOVÉ 200g": "CROSTATINE ČOKOLÁDOVÉ 200g",
-  "ČOKOLÁDOVÉ SRDIEČKA BATTITI 200g": "ČOKOLÁDOVÁ SRDÍČKA BATTITI 200g",
+  "ČOKOLÁDOVÉ SRDIEČKA BATTITI 200g": "Piaceri Mediterranei ČOKOLÁDOVÁ SRDÍČKA BATTITI 200g",
   "ČOKOLÁDOVÝ CHLIEB 250g": "ČOKOLÁDOVÝ CHLÉB 250g",
+  "DONUTY BIELE 90g": "Piaceri Mediterranei DONUTY BÍLÉ 90g",
+  "DONUTY Orieškové 90g": "Piaceri Mediterranei DONUTY OŘÍŠKOVÉ 90g",
+  "DONUTY RUZOVE 90g": "DONUTY S BÍLOU POLEVOU 80g",
   "ELISEO krémové sušienky 200g": "ELISEO 200g",
   "ELISEO s BIELOU ČOKOLÁDOU 200g": "ELISEO s BÍLOU ČOKOLÁDOU 200g",
   "FROLLINI KAKAO 200g": "FROLLINI KAKAO 200g",
   "FROLLINI S ČOKOLÁDOVÝMI LUPIENKAMI 200g": "FROLLINI S ČOKOLÁDOVÝMI LUPÍNKY 200g",
+  "GNOCCHI 400g (2x200g)": "GNOCCHI 200g",
+  "GOLOMIX KAKAOVÉ SUŠIENKY S HVIEZD. 200g": "Piaceri Mediterranei GOLOMIX KAKAOVÉ SUŠENKY s hvězdičkami 200g",
   "GRISSINI TYČINKY klasické 150g": "GRISSINI TYČINKY klasické 150g",
   "GRISSINI TYČINKY s olivovým olejom 150g": "GRISSINI TYČINKY s olivovým olejem 150g",
   "GRISSINI TYČINKY s rozmarínom 150g": "GRISSINI TYČINKY s rozmarýnem 150g",
   "GRISSINI TYČINKY sézamové 150g": "GRISSINI TYČINKY sezamové 150g",
+  "GRISSINI TYČINKY 160g": "Piaceri Mediterranei GRISSINI TYČINKY 160g",
   "HARMÓNIA – sušienky s kúskami čokolády 200g": "HARMONIE – sušenky s kousky čokolády 200g",
-  "JOGURTOVÉ SUŠIENKY S 5 CEREÁLIAMI 200g": "JOGURTOVÉ SUŠENKY S 5 CEREÁLIEMI 200g",
-  "JOGURTOVÉ SUŠIENKY S MALINAMI 210g": "JOGURTOVÉ SUŠENKY S MALINAMI",
+  "JOGURTOVÉ SUŠIENKY S 5 CEREÁLIAMI 200g": "Piaceri Mediterranei JOGURTOVÉ SUŠENKY S 5 CEREÁLIEMI 200g",
+  "JOGURTOVÉ SUŠIENKY S MALINAMI 210g": "Piaceri Mediterranei JOGURTOVÉ SUŠENKY S MALINAMI 210g",
   "KAKAOVÉ CROISSANTY 200g": "KAKAOVÉ CROISSANTY 200g",
   "KLASICKÉ CROISSANTY 200g": "KLASICKÉ CROISSANTY 200g",
   "KOSTKY s mliečnou čokoládou 200g": "KOSTKY s mléčnou čokoládou 200g",
   "MIRTILLINI sušienky s čučoriedkami 200g": "MIRTILLINI sušenky s borůvkami 200g",
+  "MUFFINY S OVOCNOU NÁPLNOU (200g)": "Piaceri Mediterranei bezlepkové MUFFINY S OVOCNOU NÁPLNÍ 200g (4ks)",
+  "MUFFINY S ČOKOLÁDOVÝMI KÚSKAMI 200g": "MUFFIN S ČOKOLÁDOVÝMI KOUSKY 200g",
+  "OPLATKY S LIESKOORÍŠKOVOU PRÍCHUTOU 45g": "Piaceri Mediterranei OPLATKY S LÍSKOOŘÍŠKOVOU PŘÍCHUTÍ 45g",
+  "OPLATKY S VANILKOVOU PRÍCHUTOU 45g": "Piaceri Mediterranei OPLATKY S VANILKOVOU PŘÍCHUTÍ 45g",
   "PAVONETTI – krehké sušienky 140g": "PAVONETTI - bezlepkové křehké sušenky 140g",
+  "PIACERINI DUNE BIELA ​​33g": "Piaceri Mediterranei PIACERINI TYČINKA DUNE WHITE 33g",
+  "PIACERINI TYČINKA DUNE DARK 33g": "Piaceri Mediterranei PIACERINI BEZLEPKOVÁ TYČINKA DUNE DARK (33g)  bez lepku, bez palmového oleje",
+  "PIACERINI TYČINKA DUNE WHITE 33g": "Piaceri Mediterranei PIACERINI TYČINKA DUNE WHITE 33g",
+  "PISTÁCIOVÉ DONUTY (90g)": "Piaceri Mediterranei bezlepkové DONUTY PISTÁCIOVÉ 90g",
+  "PISTÁCIOVÉ OPLATKY 150g": "PISTÁCIOVÉ OPLATKY 150g",
   "PLNENÉ WAFLE S KRÉMOM GIANDUIA 150g": "PLNĚNÉ OPLATKY S KRÉMEM GIANDUIA 150g",
   "PLNENÉ WAFLE S LIESKOVOORIEŠKOVOU NÁPLŇOU 175g": "PLNĚNÉ OPLATKY S LÍSKOOŘÍŠKOVOU NÁPLNÍ 175g",
   "POLENTA hrubozrnná 500g": "POLENTA hrubozrnná 500g",
   "POLENTA jemnozrnná 500g": "POLENTA jemnozrnná 500g",
   "SAVOIARDI PIŠKÓTY 150g": "SAVOIARDI PIŠKOTY 150g",
+  "SFIZI BBQ 100g": "Piaceri Mediterranei SFIZI BBQ KŘUPKY 100g",
+  "SFOGLIATINE S MARHUĽOVOU GLAZÚROU 150g": "SFOGLIATINE KŘEHKÉ SUŠENKY S MERUŇKOVOU GLAZUROU 150g",
   "SLANÉ KREKRY 175g": "SLANÉ KREKRY 175g",
-  "SUŠIENKY CANESTRELLI 125g": "SUŠENKY CANESTRELLI",
+  "SUŠIENKY CANESTRELLI 125g": "Piaceri Mediterranei bezlepkové KYTIČKOVÉ SUŠENKY CANESTRELLI 125g",
   "SUŠIENKY S KARAMELOM 200g": "SUŠENKY S KARAMELEM 200g",
   "TARALLI klasické 200g": "TARALLI klasické 200g",
-  "TARALLI s extra virgin olivovým olejom 200g": "TARALLI s extra virgin olivovým olejem 200g",
+  "TARALLI MEDITERRANEAN 200g": "TARALLI MEDITERRANEAN 200g",
+  "TARALLI s extra virgin olivovým olejom 200g": "TARALLI S EXTRA PANENSKÝM OLIVOVÝM OLEJEM 200g",
   "TARALLINI SLADKÉ 200g": "TARALLINI SLADKÉ 200g",
   "TOAST CELOZRNNÝ 400g": "TOUST CELOZRNNÝ 400g",
   "TOAST KLASICKÝ 400g": "TOUST KLASICKÝ 400g",
   "TOAST RUSTIKÁLNY 400g": "TOUST RUSTIKÁLNÍ 400g",
+  "TORTELLINI PROSCIUTTO CRUDO 250g": "Piaceri Mediterranei TORTELLINI PROSCIUTTO CRUDO 250g (2 porce)",
+  "TORTELLINI S MÄSOM 250g (2 porcie)": "Piaceri Mediterranei TORTELLINI S MASEM 250g (2 porce)",
+  "TORTELLONI S RICOTTOU A ŠPENÁTOM 250g (2 porcie)": "Piaceri Mediterranei TORTELLONI S RICOTTOU A ŠPENÁTEM 250g (2 porce)",
   "VEGÁNSKE PIŠKÓTY 150g": "VEGANSKÉ PIŠKOTY 150g",
+  "VENTAGLIETTI - bezlepkové krehké vejáriky 140g": "VENTAGLIETTI - bezlepkové křehké vějířky 140g",
+  "BIELÝ BEZLEPKOVÝ KRÁJENÝ CHLIEB (300g)": "Piaceri Mediterranei BÍLÝ BEZLEPKOVÝ KRÁJENÝ CHLÉB (300g)",
+  "RUSTIKÁLNY BEZLEPKOVÝ KRÁJENÝ CHLIEB (300g)": "Piaceri Mediterranei RUSTIKÁLNÍ BEZLEPKOVÝ KRÁJENÝ CHLÉB (300g)",
+  "WRAP (180 g)": "Piaceri Mediterranei bezlepkový WRAP 180g (3ks)",
   "ZMES MÚKY NA BEZLEPKOVÝ CHLIEB 500g": "SMĚS MOUKY NA BEZLEPKOVÝ CHLÉB 500g",
   "ZMES MÚKY NA PIZZU 500g": "SMĚS MOUKY NA PIZZU 500g",
 };
@@ -129,13 +170,19 @@ function markBoldText(text: string, html: string, boldClasses: string[]): string
   }
   
   // Replace bold words in text with markdown bold
+  // Extend partial matches to full words
   let result = text;
   for (const word of boldWords) {
     // Escape special regex characters
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const wordRegex = new RegExp(`(?<!\\*\\*)${escaped}(?!\\*\\*)`, 'g');
-    result = result.replace(wordRegex, `**${word}**`);
+    // Match the bold fragment and extend to the full word (including Slovak diacritics)
+    // This captures any word characters before and after the bold fragment
+    const fullWordRegex = new RegExp(`(?<!\\*\\*)([a-záäčďéěíĺľňóôŕšťúůýžA-ZÁÄČĎÉĚÍĹĽŇÓÔŔŠŤÚŮÝŽ]*${escaped}[a-záäčďéěíĺľňóôŕšťúůýžA-ZÁÄČĎÉĚÍĹĽŇÓÔŔŠŤÚŮÝŽ]*)(?!\\*\\*)`, 'g');
+    result = result.replace(fullWordRegex, '**$1**');
   }
+  
+  // Clean up any double bold markers
+  result = result.replace(/\*\*\*\*+/g, '**');
   
   return result;
 }
