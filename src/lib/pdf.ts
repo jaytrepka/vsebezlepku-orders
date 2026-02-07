@@ -147,100 +147,96 @@ function wrapTextWithFont(text: string, maxWidth: number, fontSize: number, font
   return lines;
 }
 
+// Parse text with **bold** markers into word tokens preserving bold info
+interface WordToken {
+  text: string;
+  bold: boolean;
+}
+
+function parseTextToWordTokens(text: string): WordToken[] {
+  const tokens: WordToken[] = [];
+  const regex = /\*\*([^*]+)\*\*|([^*\s]+)/g;
+  let match;
+  
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1]) {
+      // Bold text (inside **)
+      tokens.push({ text: match[1], bold: true });
+    } else if (match[2]) {
+      // Regular text
+      tokens.push({ text: match[2], bold: false });
+    }
+  }
+  
+  // Merge punctuation with previous token
+  const merged: WordToken[] = [];
+  for (const token of tokens) {
+    if (/^[.,;:!?]+$/.test(token.text) && merged.length > 0) {
+      merged[merged.length - 1].text += token.text;
+    } else {
+      merged.push(token);
+    }
+  }
+  
+  return merged;
+}
+
 // Wrap text with bold markers preserved, returning lines as segment arrays
-// Keeps punctuation attached to preceding word (e.g., "mléko." stays together)
 function wrapTextWithBold(text: string, maxWidth: number, fontSize: number, font: PDFFont, fontBold: PDFFont): TextSegment[][] {
-  // Remove ** markers for word splitting but track positions
-  const plainText = text.replace(/\*\*/g, '');
-  const rawWords = plainText.split(/\s+/);
+  const tokens = parseTextToWordTokens(text);
   
-  // Keep punctuation attached to previous word
-  const words: string[] = [];
-  for (const word of rawWords) {
-    if (/^[.,;:!?]+$/.test(word) && words.length > 0) {
-      words[words.length - 1] += word;
-    } else {
-      words.push(word);
-    }
-  }
-  
-  // Track bold ranges in plain text
-  const boldRanges: { start: number; end: number }[] = [];
-  let plainIndex = 0;
-  let originalIndex = 0;
-  
-  while (originalIndex < text.length) {
-    if (text.slice(originalIndex, originalIndex + 2) === '**') {
-      originalIndex += 2;
-      const startPlain = plainIndex;
-      // Find closing **
-      const closeIdx = text.indexOf('**', originalIndex);
-      if (closeIdx !== -1) {
-        const boldText = text.slice(originalIndex, closeIdx);
-        boldRanges.push({ start: startPlain, end: startPlain + boldText.length });
-        plainIndex += boldText.length;
-        originalIndex = closeIdx + 2;
-      }
-    } else {
-      plainIndex++;
-      originalIndex++;
-    }
-  }
-  
-  // Function to check if a character position is bold
-  const isBold = (pos: number) => boldRanges.some(r => pos >= r.start && pos < r.end);
-  
-  // Wrap into lines
   const lines: TextSegment[][] = [];
-  let currentLine = "";
-  let currentLineStart = 0;
-  let charPos = 0;
+  let currentLineTokens: WordToken[] = [];
+  let currentLineWidth = 0;
   
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const testWidth = font.widthOfTextAtSize(testLine.replace(/\*\*/g, ''), fontSize);
+  for (const token of tokens) {
+    const tokenFont = token.bold ? fontBold : font;
+    const tokenWidth = tokenFont.widthOfTextAtSize(token.text, fontSize);
+    const spaceWidth = font.widthOfTextAtSize(' ', fontSize);
+    const addedWidth = currentLineTokens.length > 0 ? spaceWidth + tokenWidth : tokenWidth;
     
-    if (testWidth <= maxWidth) {
-      currentLine = testLine;
+    if (currentLineWidth + addedWidth <= maxWidth) {
+      currentLineTokens.push(token);
+      currentLineWidth += addedWidth;
     } else {
-      if (currentLine) {
-        // Convert currentLine to segments
-        lines.push(lineToSegments(currentLine, currentLineStart, isBold));
-        currentLineStart = charPos;
+      // Finish current line
+      if (currentLineTokens.length > 0) {
+        lines.push(tokensToSegments(currentLineTokens));
       }
-      currentLine = word;
+      // Start new line with this token
+      currentLineTokens = [token];
+      currentLineWidth = tokenWidth;
     }
-    charPos += word.length + (i < words.length - 1 ? 1 : 0);
   }
-  if (currentLine) {
-    lines.push(lineToSegments(currentLine, currentLineStart, isBold));
+  
+  // Add remaining tokens
+  if (currentLineTokens.length > 0) {
+    lines.push(tokensToSegments(currentLineTokens));
   }
   
   return lines;
 }
 
-// Convert a line to segments based on bold positions
-function lineToSegments(line: string, startPos: number, isBold: (pos: number) => boolean): TextSegment[] {
-  const segments: TextSegment[] = [];
-  let currentText = "";
-  let currentBold = isBold(startPos);
+// Convert tokens to segments, merging adjacent tokens with same bold state
+function tokensToSegments(tokens: WordToken[]): TextSegment[] {
+  if (tokens.length === 0) return [];
   
-  for (let i = 0; i < line.length; i++) {
-    const charBold = isBold(startPos + i);
-    if (charBold !== currentBold) {
-      if (currentText) {
-        segments.push({ text: currentText, bold: currentBold });
-      }
-      currentText = line[i];
-      currentBold = charBold;
+  const segments: TextSegment[] = [];
+  let currentText = tokens[0].text;
+  let currentBold = tokens[0].bold;
+  
+  for (let i = 1; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.bold === currentBold) {
+      currentText += ' ' + token.text;
     } else {
-      currentText += line[i];
+      segments.push({ text: currentText, bold: currentBold });
+      currentText = ' ' + token.text; // Add space before new segment
+      currentBold = token.bold;
     }
   }
-  if (currentText) {
-    segments.push({ text: currentText, bold: currentBold });
-  }
+  
+  segments.push({ text: currentText, bold: currentBold });
   return segments;
 }
 
