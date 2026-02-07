@@ -599,6 +599,16 @@ export async function POST(request: Request) {
 
         // Transfer bold allergens from Czech label to Slovak ingredients
         const slovakIngredientsWithBold = transferBoldAllergens(label.ingredients, czechLabel.slozeni);
+        
+        // Debug logging for specific products
+        if (label.name.includes('BATTITI') || label.name.includes('SRDIEČKA')) {
+          console.log('=== BATTITI DEBUG ===');
+          console.log('Slovak name:', label.name);
+          console.log('Czech productName:', czechLabel.productName);
+          console.log('Czech slozeni has bold:', czechLabel.slozeni.includes('**'));
+          console.log('Slovak before:', label.ingredients.substring(0, 100));
+          console.log('Slovak after:', slovakIngredientsWithBold.substring(0, 100));
+        }
 
         // Check if Slovak label already exists
         const existingLabel = await prisma.productLabel.findFirst({
