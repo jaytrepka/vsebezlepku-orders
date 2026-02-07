@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const DOC_URL =
+const DOC_URL_HTML =
   "https://docs.google.com/document/d/1V97zNPTENRnjfqJS1_WCAq_K8WDsSWGrF3DmerVxidg/export?format=html";
+const DOC_URL_TXT =
+  "https://docs.google.com/document/d/1V97zNPTENRnjfqJS1_WCAq_K8WDsSWGrF3DmerVxidg/export?format=txt";
 
 // Map Slovak product names to Czech product names for matching
 const slovakToCzechMap: Record<string, string> = {
@@ -69,7 +71,7 @@ interface LabelData {
 }
 
 async function fetchHtmlDocument(): Promise<{ html: string; boldClasses: string[] }> {
-  const response = await fetch(DOC_URL);
+  const response = await fetch(DOC_URL_HTML);
   const html = await response.text();
   
   // Extract bold classes from CSS
@@ -87,6 +89,11 @@ async function fetchHtmlDocument(): Promise<{ html: string; boldClasses: string[
   }
   
   return { html, boldClasses };
+}
+
+async function fetchTextDocument(): Promise<string> {
+  const response = await fetch(DOC_URL_TXT);
+  return await response.text();
 }
 
 function markBoldText(text: string, html: string, boldClasses: string[]): string {
@@ -116,6 +123,67 @@ function markBoldText(text: string, html: string, boldClasses: string[]): string
   }
   
   return result;
+}
+
+function extractSlovakLabelsFromText(text: string): LabelData[] {
+  const labels: LabelData[] = [];
+  
+  // Split by product codes (like D136, S042, CO10, P019)
+  const productBlocks = text.split(/(?=^[A-Z]{1,2}\d{2,3}\s*$)/m);
+  
+  for (const block of productBlocks) {
+    // Check if block contains ingredients (either "Zloženie:" or "Ingrediencie:")
+    if (!block.match(/(?:Zloženie|Ingrediencie):/i)) continue;
+    
+    // Extract product name - usually on the first or second line after code
+    const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 3) continue;
+    
+    // Find the product name (usually contains weight like "200g" or "200 g")
+    let name = '';
+    for (let i = 0; i < Math.min(4, lines.length); i++) {
+      if (lines[i].match(/\d+\s*g|\d+\s*ks/i) && !lines[i].match(/^[A-Z]{1,2}\d{2,3}$/)) {
+        name = lines[i].trim();
+        break;
+      }
+    }
+    
+    if (!name) continue;
+    
+    // Extract ingredients (either "Zloženie:" or "Ingrediencie:")
+    const ingredientsMatch = block.match(/(?:Zloženie|Ingrediencie):\s*([\s\S]*?)(?=Nutričné|Výrobca:|Príprava:|$)/i);
+    let ingredients = ingredientsMatch ? ingredientsMatch[1].trim() : '';
+    
+    // Clean up ingredients
+    ingredients = ingredients
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Extract nutritional values
+    const nutritionMatch = block.match(/Nutričné[^:]*hodnoty[^:]*:\s*([\s\S]*?)(?=Výrobca:|Skladujte|Príprava:|Minimálna|$)/i);
+    let nutritionalValues = nutritionMatch ? nutritionMatch[1].trim() : '';
+    nutritionalValues = nutritionalValues
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Default storage and producer for Slovak
+    const storage = 'Skladujte na suchom mieste pri izbovej teplote.';
+    const producer = 'Piaceri Mediterranei – Taliansko';
+    
+    if (name && ingredients) {
+      labels.push({
+        name,
+        ingredients,
+        nutritionalValues,
+        storage,
+        producer,
+      });
+    }
+  }
+  
+  return labels;
 }
 
 function extractSlovakLabelsFromHtml(html: string, boldClasses: string[]): LabelData[] {
@@ -237,15 +305,31 @@ export async function POST(request: Request) {
 
     let labels: LabelData[] = [];
 
-    if (useHtml) {
+    // Always use text parsing for extraction, but fetch HTML for bold detection if requested
+    const textContent = await fetchTextDocument();
+    labels = extractSlovakLabelsFromText(textContent);
+    
+    console.log(`Found ${labels.length} Slovak labels from text`);
+    
+    // If HTML mode, also get bold classes for allergen marking
+    if (useHtml && labels.length > 0) {
       const { html, boldClasses } = await fetchHtmlDocument();
-      console.log(`Found ${boldClasses.length} bold CSS classes:`, boldClasses);
-      labels = extractSlovakLabelsFromHtml(html, boldClasses);
-    } else {
-      return NextResponse.json(
-        { error: "Please use ?html=true parameter for Slovak import" },
-        { status: 400 }
-      );
+      console.log(`Found ${boldClasses.length} bold CSS classes for allergen detection`);
+      
+      // Re-process with HTML bold detection
+      if (boldClasses.length > 0) {
+        labels = labels.map(label => {
+          const nameEscaped = label.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const productHtmlMatch = html.match(new RegExp(`${nameEscaped}[\\s\\S]*?(?=<p[^>]*>[A-Z]{1,2}\\d{2,3}|$)`, 'i'));
+          if (productHtmlMatch) {
+            return {
+              ...label,
+              ingredients: markBoldText(label.ingredients, productHtmlMatch[0], boldClasses),
+            };
+          }
+          return label;
+        });
+      }
     }
 
     console.log(`Found ${labels.length} Slovak labels to import`);
