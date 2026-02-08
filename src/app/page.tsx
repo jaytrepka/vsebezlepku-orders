@@ -303,6 +303,42 @@ export default function Home() {
     }
   }
 
+  async function switchModalLanguage(newLang: "cs" | "pl" | "sk") {
+    if (!labelModal) return;
+    
+    // Fetch label for the new language
+    try {
+      const res = await fetch(`/api/labels?language=${newLang}`);
+      const labels = await res.json();
+      const label = Array.isArray(labels) 
+        ? labels.find((l: ProductLabel) => l.productName === labelModal.productName)
+        : null;
+      
+      setLabelModal({ ...labelModal, language: newLang, isEdit: !!label });
+      
+      if (label) {
+        setLabelForm({
+          nazev: label.nazev,
+          slozeni: label.slozeni,
+          nutricniHodnoty: label.nutricniHodnoty,
+          skladovani: label.skladovani || "",
+          vyrobce: label.vyrobce,
+        });
+      } else {
+        // No label for this language yet - start with empty form
+        setLabelForm({
+          nazev: labelModal.productName,
+          slozeni: "",
+          nutricniHodnoty: "",
+          skladovani: "",
+          vyrobce: "",
+        });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při načítání štítku" });
+    }
+  }
+
   async function fetchProductInfo() {
     if (!labelModal?.productUrl) return;
     
@@ -627,8 +663,8 @@ export default function Home() {
                   <button
                     key={lang}
                     type="button"
-                    onClick={() => setLabelModal({ ...labelModal, language: lang })}
-                    className={`px-3 py-1.5 rounded text-sm ${
+                    onClick={() => switchModalLanguage(lang)}
+                    className={`px-3 py-1.5 rounded text-sm cursor-pointer ${
                       labelModal.language === lang
                         ? "bg-blue-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
