@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
         nutricniHodnoty: data.nutricniHodnoty,
         skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
+        verified: data.verified ?? undefined,
       },
       create: {
         productName: data.productName,
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
         nutricniHodnoty: data.nutricniHodnoty,
         skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
+        verified: data.verified ?? false,
       },
     });
 
@@ -91,6 +93,34 @@ export async function POST(request: NextRequest) {
     console.error("Label save error:", error);
     return NextResponse.json(
       { error: "Failed to save label" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH - Update verified status for a label
+export async function PATCH(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { id, verified } = data;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Label ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const label = await prisma.productLabel.update({
+      where: { id },
+      data: { verified: verified ?? false },
+    });
+
+    return NextResponse.json(label);
+  } catch (error) {
+    console.error("Label update error:", error);
+    return NextResponse.json(
+      { error: "Failed to update label" },
       { status: 500 }
     );
   }

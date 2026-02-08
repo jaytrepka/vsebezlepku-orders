@@ -11,6 +11,7 @@ interface ProductLabel {
   nutricniHodnoty: string;
   skladovani?: string;
   vyrobce: string;
+  verified?: boolean;
 }
 
 interface OrderItem {
@@ -105,6 +106,25 @@ export default function Home() {
         map.set(label.productName, label);
       }
       setLanguageLabels(map);
+    }
+  }
+
+  async function toggleVerified(label: ProductLabel) {
+    try {
+      const res = await fetch("/api/labels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: label.id, verified: !label.verified }),
+      });
+      if (res.ok) {
+        // Refresh data
+        fetchOrders();
+        if (labelLanguage !== "cs") {
+          fetchLanguageLabels();
+        }
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při aktualizaci štítku" });
     }
   }
 
@@ -501,13 +521,26 @@ export default function Home() {
                             if (labelLanguage === "cs") {
                               // Czech: show edit if has label, add if not
                               return hasCzechLabel ? (
-                                <button
-                                  onClick={() => openLabelModal(item.productName, item.label, item.productUrl, "cs")}
-                                  className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
-                                >
-                                  <Edit2 className="w-3 h-3" />
-                                  Štítek ✓
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => openLabelModal(item.productName, item.label, item.productUrl, "cs")}
+                                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    Štítek ✓
+                                  </button>
+                                  <label className="flex items-center gap-1 text-xs cursor-pointer" title="Ověřeno">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.label?.verified ?? false}
+                                      onChange={() => item.label && toggleVerified(item.label)}
+                                      className="w-3 h-3 rounded"
+                                    />
+                                    <span className={item.label?.verified ? "text-green-600" : "text-gray-400"}>
+                                      {item.label?.verified ? "✓" : "?"}
+                                    </span>
+                                  </label>
+                                </>
                               ) : (
                                 <button
                                   onClick={() => openLabelModal(item.productName, null, item.productUrl, "cs")}
@@ -527,13 +560,26 @@ export default function Home() {
                                 );
                               }
                               return langLabel ? (
-                                <button
-                                  onClick={() => openLabelModal(item.label!.productName, langLabel, item.productUrl, labelLanguage)}
-                                  className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
-                                >
-                                  <Edit2 className="w-3 h-3" />
-                                  {labelLanguage.toUpperCase()} ✓
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => openLabelModal(item.label!.productName, langLabel, item.productUrl, labelLanguage)}
+                                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    {labelLanguage.toUpperCase()} ✓
+                                  </button>
+                                  <label className="flex items-center gap-1 text-xs cursor-pointer" title="Ověřeno">
+                                    <input
+                                      type="checkbox"
+                                      checked={langLabel.verified ?? false}
+                                      onChange={() => toggleVerified(langLabel)}
+                                      className="w-3 h-3 rounded"
+                                    />
+                                    <span className={langLabel.verified ? "text-green-600" : "text-gray-400"}>
+                                      {langLabel.verified ? "✓" : "?"}
+                                    </span>
+                                  </label>
+                                </>
                               ) : (
                                 <button
                                   onClick={() => openLabelModal(item.label!.productName, null, item.productUrl, labelLanguage)}

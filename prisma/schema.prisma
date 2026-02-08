@@ -38,6 +38,7 @@ model ProductLabel {
   nutricniHodnoty String      // Nutrition facts
   skladovani      String?     // Storage instructions (optional)
   vyrobce         String      // Manufacturer
+  verified        Boolean     @default(false) // Whether the label has been verified as correct
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   orderItems      OrderItem[]
