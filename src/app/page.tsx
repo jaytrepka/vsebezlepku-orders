@@ -524,27 +524,26 @@ export default function Home() {
                                 <>
                                   <button
                                     onClick={() => openLabelModal(item.productName, item.label, item.productUrl, "cs")}
-                                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1 cursor-pointer"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                     Štítek ✓
                                   </button>
                                   <button
                                     onClick={() => item.label && toggleVerified(item.label)}
-                                    className={`text-xs px-1.5 py-0.5 rounded ${
+                                    className={`text-xs px-2 py-1 rounded cursor-pointer ${
                                       item.label?.verified
                                         ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                        : "bg-gray-200 text-gray-600 hover:bg-gray-300"
                                     }`}
-                                    title={item.label?.verified ? "Ověřeno" : "Neověřeno"}
                                   >
-                                    {item.label?.verified ? "✓" : "?"}
+                                    {item.label?.verified ? "ověřeno" : "neověřeno"}
                                   </button>
                                 </>
                               ) : (
                                 <button
                                   onClick={() => openLabelModal(item.productName, null, item.productUrl, "cs")}
-                                  className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1"
+                                  className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded hover:bg-yellow-200 flex items-center gap-1 cursor-pointer"
                                 >
                                   <Plus className="w-3 h-3" />
                                   Přidat štítek
@@ -563,27 +562,26 @@ export default function Home() {
                                 <>
                                   <button
                                     onClick={() => openLabelModal(item.label!.productName, langLabel, item.productUrl, labelLanguage)}
-                                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1"
+                                    className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1 cursor-pointer"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                     {labelLanguage.toUpperCase()} ✓
                                   </button>
                                   <button
                                     onClick={() => toggleVerified(langLabel)}
-                                    className={`text-xs px-1.5 py-0.5 rounded ${
+                                    className={`text-xs px-2 py-1 rounded cursor-pointer ${
                                       langLabel.verified
                                         ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                        : "bg-gray-200 text-gray-600 hover:bg-gray-300"
                                     }`}
-                                    title={langLabel.verified ? "Ověřeno" : "Neověřeno"}
                                   >
-                                    {langLabel.verified ? "✓" : "?"}
+                                    {langLabel.verified ? "ověřeno" : "neověřeno"}
                                   </button>
                                 </>
                               ) : (
                                 <button
                                   onClick={() => openLabelModal(item.label!.productName, null, item.productUrl, labelLanguage)}
-                                  className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1"
+                                  className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1 cursor-pointer"
                                 >
                                   <Plus className="w-3 h-3" />
                                   Přidat {labelLanguage.toUpperCase()}
