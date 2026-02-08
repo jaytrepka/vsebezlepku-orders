@@ -529,17 +529,17 @@ export default function Home() {
                                     <Edit2 className="w-3 h-3" />
                                     Štítek ✓
                                   </button>
-                                  <label className="flex items-center gap-1 text-xs cursor-pointer" title="Ověřeno">
-                                    <input
-                                      type="checkbox"
-                                      checked={item.label?.verified ?? false}
-                                      onChange={() => item.label && toggleVerified(item.label)}
-                                      className="w-3 h-3 rounded"
-                                    />
-                                    <span className={item.label?.verified ? "text-green-600" : "text-gray-400"}>
-                                      {item.label?.verified ? "✓" : "?"}
-                                    </span>
-                                  </label>
+                                  <button
+                                    onClick={() => item.label && toggleVerified(item.label)}
+                                    className={`text-xs px-1.5 py-0.5 rounded ${
+                                      item.label?.verified
+                                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                    }`}
+                                    title={item.label?.verified ? "Ověřeno" : "Neověřeno"}
+                                  >
+                                    {item.label?.verified ? "✓" : "?"}
+                                  </button>
                                 </>
                               ) : (
                                 <button
@@ -568,17 +568,17 @@ export default function Home() {
                                     <Edit2 className="w-3 h-3" />
                                     {labelLanguage.toUpperCase()} ✓
                                   </button>
-                                  <label className="flex items-center gap-1 text-xs cursor-pointer" title="Ověřeno">
-                                    <input
-                                      type="checkbox"
-                                      checked={langLabel.verified ?? false}
-                                      onChange={() => toggleVerified(langLabel)}
-                                      className="w-3 h-3 rounded"
-                                    />
-                                    <span className={langLabel.verified ? "text-green-600" : "text-gray-400"}>
-                                      {langLabel.verified ? "✓" : "?"}
-                                    </span>
-                                  </label>
+                                  <button
+                                    onClick={() => toggleVerified(langLabel)}
+                                    className={`text-xs px-1.5 py-0.5 rounded ${
+                                      langLabel.verified
+                                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                    }`}
+                                    title={langLabel.verified ? "Ověřeno" : "Neověřeno"}
+                                  >
+                                    {langLabel.verified ? "✓" : "?"}
+                                  </button>
                                 </>
                               ) : (
                                 <button
