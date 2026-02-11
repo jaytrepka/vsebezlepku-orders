@@ -36,6 +36,14 @@ const czechLabels = [
     vyrobce: "Piaceri Mediterranei – Italy"
   },
   {
+    productName: "Piaceri Mediterranei motýlkové těstoviny FARFALLE 400g  Bezlepkové těstoviny ve tvaru motýlků",
+    nazev: "FARFALLE 400g",
+    slozeni: "Kukuřičná mouka (60 %), rýžová mouka (35 %), pohanková mouka (5 %). Může obsahovat sóju.",
+    nutricniHodnoty: "Energetická hodnota: 1503 kJ / 354 kcal. Tuky 1,6g (z toho nasycené mastné kyseliny 1g). Sacharidy 77g (z toho cukry 1,5g). Vláknina 1,6g. Bílkoviny 7g. Sůl 0,015g.",
+    skladovani: "Skladujte na suchém místě při pokojové teplotě.",
+    vyrobce: "Piaceri Mediterranei – Italy"
+  },
+  {
     productName: "CANNELLONI",
     nazev: "CANNELLONI",
     slozeni: "Žlutá kukuřičná mouka (49,8 %), bílá kukuřičná mouka (49,8 %), emulgátor: mono- a diglyceridy mastných kyselin. Může obsahovat stopy sóji a vajec.",
@@ -96,6 +104,30 @@ const czechLabels = [
     nazev: "PISTÁCIOVÉ OPLATKY 150g",
     slozeni: "Bramborový škrob, glukóza, kokosový olej, cukr, pistácie 12%, rýžová mouka, sušené odstředěné mléko bez laktózy 4,9%, emulgátor: sójový lecitin; sůl, zahušťovadlo: guarová mouka; kypřící látka: hydrogenuhličitan sodný. Může obsahovat jiné ořechy a sezam. Obsah laktózy je nižší než 0,1 g na 100 g.",
     nutricniHodnoty: "Energetická hodnota: 2150 kJ / 513 kcal. Tuky 25,1g (z toho nasycené mastné kyseliny 18,3g). Sacharidy 66,1g (z toho cukry 25,1g). Vláknina 1,8g. Bílkoviny 4,9g. Sůl <0,25g.",
+    skladovani: "Skladujte na suchém místě při pokojové teplotě.",
+    vyrobce: "Piaceri Mediterranei – Italy"
+  },
+  {
+    productName: "DOBLONI DARK & WHITE sušenky s vanilkovým krémem 120g",
+    nazev: "DOBLONI DARK & WHITE sušenky s vanilkovým krémem 120g",
+    slozeni: "Rýžová mouka, cukr, rostlinné oleje (karité, kokos), kukuřičný škrob, dextróza, kukuřičná mouka, bramborový škrob, modifikovaný bramborový škrob, slunečnicový olej, glukózový sirup, invertovaný cukrový sirup, odtučněný kakaový prášek 4,5 %, vanilková pasta 1,1 % (glukózový sirup, přírodní vanilková aroma 1,5 %, vanilkový extrakt 1 %), zahušťovadlo: xanthanová guma; kypřící látka: jedlá soda; sůl, emulgátor: slunečnicový lecitin. Může obsahovat stopy sóji.",
+    nutricniHodnoty: "Energetická hodnota: 2000 kJ / 478 kcal. Tuky 20g (z toho nasycené mastné kyseliny 6,8g). Sacharidy 70g (z toho cukry 20,9g). Vláknina 3,1g. Bílkoviny 3,5g. Sůl 0,65g.",
+    skladovani: "Skladujte na suchém místě při pokojové teplotě.",
+    vyrobce: "Piaceri Mediterranei – Italy"
+  },
+  {
+    productName: "Piaceri Mediterranei DOBLONI DARK & WHITE sušenky s vanilkovým krémem 120g",
+    nazev: "DOBLONI DARK & WHITE sušenky s vanilkovým krémem 120g",
+    slozeni: "Rýžová mouka, cukr, rostlinné oleje (karité, kokos), kukuřičný škrob, dextróza, kukuřičná mouka, bramborový škrob, modifikovaný bramborový škrob, slunečnicový olej, glukózový sirup, invertovaný cukrový sirup, odtučněný kakaový prášek 4,5 %, vanilková pasta 1,1 % (glukózový sirup, přírodní vanilková aroma 1,5 %, vanilkový extrakt 1 %), zahušťovadlo: xanthanová guma; kypřící látka: jedlá soda; sůl, emulgátor: slunečnicový lecitin. Může obsahovat stopy sóji.",
+    nutricniHodnoty: "Energetická hodnota: 2000 kJ / 478 kcal. Tuky 20g (z toho nasycené mastné kyseliny 6,8g). Sacharidy 70g (z toho cukry 20,9g). Vláknina 3,1g. Bílkoviny 3,5g. Sůl 0,65g.",
+    skladovani: "Skladujte na suchém místě při pokojové teplotě.",
+    vyrobce: "Piaceri Mediterranei – Italy"
+  },
+  {
+    productName: "Piaceri Mediterranei DOBLONI DARK &amp; WHITE sušenky s vanilkovým krémem 120g",
+    nazev: "DOBLONI DARK & WHITE sušenky s vanilkovým krémem 120g",
+    slozeni: "Rýžová mouka, cukr, rostlinné oleje (karité, kokos), kukuřičný škrob, dextróza, kukuřičná mouka, bramborový škrob, modifikovaný bramborový škrob, slunečnicový olej, glukózový sirup, invertovaný cukrový sirup, odtučněný kakaový prášek 4,5 %, vanilková pasta 1,1 % (glukózový sirup, přírodní vanilková aroma 1,5 %, vanilkový extrakt 1 %), zahušťovadlo: xanthanová guma; kypřící látka: jedlá soda; sůl, emulgátor: slunečnicový lecitin. Může obsahovat stopy sóji.",
+    nutricniHodnoty: "Energetická hodnota: 2000 kJ / 478 kcal. Tuky 20g (z toho nasycené mastné kyseliny 6,8g). Sacharidy 70g (z toho cukry 20,9g). Vláknina 3,1g. Bílkoviny 3,5g. Sůl 0,65g.",
     skladovani: "Skladujte na suchém místě při pokojové teplotě.",
     vyrobce: "Piaceri Mediterranei – Italy"
   },
@@ -244,6 +276,22 @@ const czechLabels = [
     vyrobce: "Piaceri Mediterranei – Italy"
   },
   {
+    productName: "FUSILLI 1000g",
+    nazev: "FUSILLI 1000g",
+    slozeni: "Kukuřičná mouka 90%, rýžová mouka 10%, voda.",
+    nutricniHodnoty: "Energetická hodnota: 1535kJ / 362 kcal. Tuky 1,4g (z toho nasycené mastné kyseliny 0,2g). Sacharidy 80g (z toho cukry 0,6g). Vláknina 1,9g. Bílkoviny 6,8g. Sůl 0,01g.",
+    skladovani: "Příprava: Vložte těstoviny do osolené vroucí vody. Ideálně 1,5l vody na 100g těstovin. Vařte 9-10 minut. Občas promíchejte. Odstavte z ohně a sceďte. Skladujte na chladném a suchém místě.",
+    vyrobce: "Massimo Zero Sr. Via delle Scuderie 32, 39012 Merano (BZ) – Italy"
+  },
+  {
+    productName: "Massimo Zero FUSILLI 1000g",
+    nazev: "FUSILLI 1000g",
+    slozeni: "Kukuřičná mouka 90%, rýžová mouka 10%, voda.",
+    nutricniHodnoty: "Energetická hodnota: 1535kJ / 362 kcal. Tuky 1,4g (z toho nasycené mastné kyseliny 0,2g). Sacharidy 80g (z toho cukry 0,6g). Vláknina 1,9g. Bílkoviny 6,8g. Sůl 0,01g.",
+    skladovani: "Příprava: Vložte těstoviny do osolené vroucí vody. Ideálně 1,5l vody na 100g těstovin. Vařte 9-10 minut. Občas promíchejte. Odstavte z ohně a sceďte. Skladujte na chladném a suchém místě.",
+    vyrobce: "Massimo Zero Sr. Via delle Scuderie 32, 39012 Merano (BZ) – Italy"
+  },
+  {
     productName: "FUSILLI celozrnné 400g",
     nazev: "FUSILLI celozrnné 400g",
     slozeni: "Celozrnná kukuřičná mouka (60 %), celozrnná rýžová mouka (40 %). Může obsahovat sóju.",
@@ -257,6 +305,22 @@ const czechLabels = [
     slozeni: "Rýžový škrob, bramborová mouka, cukr, bramborové vločky, rýžová mouka, zahušťovadla: xanthan, guarová guma; sůl, barviva: kurkuma. Může obsahovat sóju a vejce.",
     nutricniHodnoty: "Energetická hodnota: 1502 kJ / 354 kcal. Tuky 0,5g (z toho nasycené mastné kyseliny 0,2g). Sacharidy 82g (z toho cukry 5g). Vláknina 2g. Bílkoviny 2,5g. Sůl 1,3g.",
     skladovani: "Skladujte na suchém místě při pokojové teplotě.",
+    vyrobce: "Piaceri Mediterranei – Italy"
+  },
+  {
+    productName: "GNOCCHI 400g (2x200g)",
+    nazev: "GNOCCHI 400g (2x200g)",
+    slozeni: "Rehydratované brambory 70% (voda, bramborové vločky), rýžová mouka, kukuřičná mouka, bramborový škrob, sůl, regulátor kyselosti: kyselina mléčná; konzervační látka: sorban draselný; přírodní příchutě.",
+    nutricniHodnoty: "Energetická hodnota: 641kJ / 151 kcal. Tuky 0,2g (z toho nasycené mastné kyseliny <0,1g). Sacharidy 34g (z toho cukry 0,1g). Vláknina 2g. Bílkoviny 2,4g. Sůl 0,79g.",
+    skladovani: "Příprava: Gnocchi vložte do vroucí vody a přidejte sůl. Jakmile vyplavou na hladinu, počkejte dvě minuty a poté je vyjměte, slijte a podávejte s oblíbenou omáčkou. Skladujte na chladném a suchém místě, mimo dosah slunečního záření a zdrojů tepla. Po otevření uchovávejte v chladu a spotřebujte do 3 dnů.",
+    vyrobce: "Piaceri Mediterranei – Italy"
+  },
+  {
+    productName: "Piaceri Mediterranei GNOCCHI 400g",
+    nazev: "GNOCCHI 400g (2x200g)",
+    slozeni: "Rehydratované brambory 70% (voda, bramborové vločky), rýžová mouka, kukuřičná mouka, bramborový škrob, sůl, regulátor kyselosti: kyselina mléčná; konzervační látka: sorban draselný; přírodní příchutě.",
+    nutricniHodnoty: "Energetická hodnota: 641kJ / 151 kcal. Tuky 0,2g (z toho nasycené mastné kyseliny <0,1g). Sacharidy 34g (z toho cukry 0,1g). Vláknina 2g. Bílkoviny 2,4g. Sůl 0,79g.",
+    skladovani: "Příprava: Gnocchi vložte do vroucí vody a přidejte sůl. Jakmile vyplavou na hladinu, počkejte dvě minuty a poté je vyjměte, slijte a podávejte s oblíbenou omáčkou. Skladujte na chladném a suchém místě, mimo dosah slunečního záření a zdrojů tepla. Po otevření uchovávejte v chladu a spotřebujte do 3 dnů.",
     vyrobce: "Piaceri Mediterranei – Italy"
   },
   {
@@ -454,10 +518,18 @@ const czechLabels = [
   {
     productName: "Massimo Zero RISONI 400g",
     nazev: "Massimo Zero RISONI 400g",
-    slozeni: "Kukuřičná mouka*, rýžová mouka*, mono a diglyceridy mastných kyselin. (*z ekologického zemědělství). Může obsahovat stopy sóji.",
-    nutricniHodnoty: "Energetická hodnota: 1481kJ / 349 kcal. Tuky 1,5g (z toho nasycené mastné kyseliny 0,3g). Sacharidy 76g (z toho cukry 0,5g). Vláknina 2,1g. Bílkoviny 7,2g. Sůl 0,02g.",
-    skladovani: "Skladujte na suchém místě při pokojové teplotě.",
-    vyrobce: "Molino Casillo S.p.A., Corato BA, Itálie"
+    slozeni: "Kukuřičná mouka 90%, rýžová mouka 10%, voda. Produkt je vyroben ze surovin bez GMO.",
+    nutricniHodnoty: "Energetická hodnota: 1535kJ / 362 kcal. Tuky 1,4g (z toho nasycené mastné kyseliny 0,2g). Sacharidy 80g (z toho cukry 0,6g). Vláknina 1,9g. Bílkoviny 6,8g. Sůl 0,01g.",
+    skladovani: "Příprava: Dejte těstoviny do osolené vroucí vody. Ideálně 1,5l vody na 100g těstovin. Vařte 8-10 minut. Občas promíchejte. Odstavte z ohně a sceďte. Skladujte na suchém a chladném místě.",
+    vyrobce: "Massimo Zero Sr. Via delle Scuderie 32, 39012 Merano (BZ) – Italy"
+  },
+  {
+    productName: "Bauer bezlepkový ZELENINOVÝ BUJÓN - kostky 60g - 12 porcí",
+    nazev: "ZELENINOVÝ BUJÓN - kostky 60g - 12 porcí",
+    slozeni: "Sójový a kukuřičný bílkovinný extrakt, jodizovaná sůl: 38,2%, palmový olej (certifikat udržitelnosti RSPO), dehydr. zelenina (brambory, mrkev, cibule, petržel, pórek, celer, česnek, rajčata): 5%, extra panenský olivový olej: 3,6 %, kvasnicový extrakt. VEGAN Certif.",
+    nutricniHodnoty: "Energetická hodnota: 927kJ / 223 kcal. Tuky 15g (z toho nasycené mastné kyseliny 7,8g). Sacharidy 7,6g (z toho cukry 2,6g). Vláknina 2,1g. Bílkoviny 14g. Sůl 50,5g.",
+    skladovani: "Příprava: Rozpusťte 1 kostku v 500 ml horké vody a vařte 2-3 minuty. (2 porce) Skladujte v suchu a chladnu.",
+    vyrobce: "Bauer S.p.A. Via Kufstein, 6 – 38121 Trento (Italy)"
   },
   {
     productName: "STELLINE 400g",

@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
         verified: data.verified ?? undefined,
+        hasFactoryLabel: data.hasFactoryLabel ?? undefined,
       },
       create: {
         productName: data.productName,
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
         skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
         verified: data.verified ?? false,
+        hasFactoryLabel: data.hasFactoryLabel ?? false,
       },
     });
 
@@ -98,11 +100,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH - Update verified status for a label
+// PATCH - Update verified status or hasFactoryLabel for a label
 export async function PATCH(request: NextRequest) {
   try {
     const data = await request.json();
-    const { id, verified } = data;
+    const { id, verified, hasFactoryLabel } = data;
 
     if (!id) {
       return NextResponse.json(
@@ -111,9 +113,13 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const updateData: { verified?: boolean; hasFactoryLabel?: boolean } = {};
+    if (verified !== undefined) updateData.verified = verified;
+    if (hasFactoryLabel !== undefined) updateData.hasFactoryLabel = hasFactoryLabel;
+
     const label = await prisma.productLabel.update({
       where: { id },
-      data: { verified: verified ?? false },
+      data: updateData,
     });
 
     return NextResponse.json(label);

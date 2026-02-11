@@ -12,6 +12,7 @@ interface ProductLabel {
   skladovani?: string;
   vyrobce: string;
   verified?: boolean;
+  hasFactoryLabel?: boolean;
 }
 
 interface OrderItem {
@@ -553,6 +554,16 @@ export default function Home() {
                           {(() => {
                             const langLabel = getLabelForProduct(item);
                             const hasCzechLabel = !!item.label;
+                            const currentLabel = labelLanguage === "cs" ? item.label : langLabel;
+                            
+                            // Check if product has factory label
+                            if (currentLabel?.hasFactoryLabel) {
+                              return (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                  Produkt má štítek z výroby
+                                </span>
+                              );
+                            }
                             
                             if (labelLanguage === "cs") {
                               // Czech: show edit if has label, add if not

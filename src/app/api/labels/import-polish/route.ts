@@ -147,6 +147,10 @@ const polishToCzechMap: Record<string, string> = {
   // Piacerini
   "PIACERINI PISTACJOWE CIASTECZKA 60g": "Piaceri Mediterranei bezlepkové PIACERINI PISTÁCIOVÉ SUŠENKY 60g Bezlepkové vaflové sušenky s pistáciovou náplní",
   "PIACERINI CIASTECZKA Z BIAŁĄ CZEKOLADĄ 81g": "Piaceri Mediterranei bezlepkové PIACERINI SUŠENKY S BÍLOU ČOKOLÁDOU 81g  Bezlepkové vaflové sušenky s bílou čokoládou",
+  // Massimo Zero pasta
+  "FUSILLI 1000g": "FUSILLI 1000g",
+  // Dobloni
+  "DOBLONI DARK & WHITE z kremem waniliowym 120g": "DOBLONI DARK & WHITE sušenky s vanilkovým krémem 120g",
 };
 
 async function fetchFullDocument(): Promise<string> {

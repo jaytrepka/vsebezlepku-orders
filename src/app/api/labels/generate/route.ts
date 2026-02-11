@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Skip items with factory labels (they already have labels from manufacturer)
+        if (label.hasFactoryLabel) {
+          continue;
+        }
+
         labelRequests.push({
           label: {
             nazev: label.nazev,

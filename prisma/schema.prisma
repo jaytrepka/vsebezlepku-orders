@@ -39,6 +39,7 @@ model ProductLabel {
   skladovani      String?     // Storage instructions (optional)
   vyrobce         String      // Manufacturer
   verified        Boolean     @default(false) // Whether the label has been verified as correct
+  hasFactoryLabel Boolean     @default(false) // Product already has label from manufacturer, no need to print
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   orderItems      OrderItem[]
