@@ -152,8 +152,54 @@
 
         setStatus(`Found ${orderRows.length} order rows, scanning...`);
 
+        // Try to get order numbers directly from the page first (faster approach)
+        const orderLinks = document.querySelectorAll('a[href*="/admin/objednavky-detail/"]');
+        const foundOrderNumbers = new Set();
+        
+        orderLinks.forEach(link => {
+            // Extract order number from link text or nearby elements
+            const row = link.closest('tr');
+            if (row) {
+                const orderCodeEl = row.querySelector('strong.orderCode, .orderCode, td strong');
+                if (orderCodeEl) {
+                    const orderNum = orderCodeEl.textContent.trim();
+                    if (orderNum.match(/^O\d+$/)) {
+                        foundOrderNumbers.add(orderNum);
+                    }
+                }
+            }
+        });
+
+        // Alternative: look for order numbers in strong tags
+        if (foundOrderNumbers.size === 0) {
+            document.querySelectorAll('table tbody tr').forEach(row => {
+                const strongEls = row.querySelectorAll('strong');
+                strongEls.forEach(el => {
+                    const text = el.textContent.trim();
+                    if (text.match(/^O\d{9,}$/)) {
+                        foundOrderNumbers.add(text);
+                    }
+                });
+            });
+        }
+
+        setStatus(`Found ${foundOrderNumbers.size} order numbers directly, now fetching details...`);
+
+        // For each order, trigger hover to get items
         for (let i = 0; i < orderRows.length; i++) {
             const row = orderRows[i];
+            
+            // Check if this row has an order number
+            const strongEls = row.querySelectorAll('strong');
+            let rowOrderNum = null;
+            strongEls.forEach(el => {
+                const text = el.textContent.trim();
+                if (text.match(/^O\d{9,}$/)) {
+                    rowOrderNum = text;
+                }
+            });
+
+            if (!rowOrderNum) continue;
 
             // Trigger mouseenter to show preview
             const event = new MouseEvent('mouseenter', {
@@ -162,16 +208,27 @@
             });
             row.dispatchEvent(event);
 
+            // Also try jQuery trigger if available
+            if (typeof $ !== 'undefined') {
+                try { $(row).trigger('mouseenter'); } catch(e) {}
+            }
+
             // Wait for preview to appear
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 400));
 
             // Find the preview popup
             const preview = document.getElementById('item-preview');
-            if (preview && preview.style.display !== 'none') {
+            if (preview && preview.style.display !== 'none' && preview.innerHTML.length > 100) {
                 const order = parseOrderFromPreview(preview);
                 if (order.orderNumber && order.items.length > 0) {
                     orders.push(order);
+                    console.log('Parsed order:', order.orderNumber, 'with', order.items.length, 'items');
+                } else if (rowOrderNum) {
+                    // Fallback: add order with just the number if preview parsing failed
+                    console.log('Preview found but parsing failed for:', rowOrderNum);
                 }
+            } else if (rowOrderNum) {
+                console.log('No preview for order:', rowOrderNum);
             }
 
             // Hide preview
@@ -282,13 +339,19 @@
 
             // Get all orders from page
             const allOrders = await getAllOrders();
-            setStatus(`Scanned ${allOrders.length} orders from Shoptet`);
+            console.log('All parsed orders:', allOrders.map(o => o.orderNumber));
+            setStatus(`Parsed ${allOrders.length} orders with items from Shoptet`);
 
             // Filter out existing orders
             const newOrders = allOrders.filter(o => !existingOrderNumbers.includes(o.orderNumber));
+            console.log('New orders to add:', newOrders.map(o => o.orderNumber));
 
             if (newOrders.length === 0) {
-                setStatus('No new orders to add. All orders already exist in LabelApp.');
+                if (allOrders.length === 0) {
+                    setStatus('Could not parse any orders. Check browser console for details.');
+                } else {
+                    setStatus(`No new orders to add. All ${allOrders.length} orders already exist in LabelApp.`);
+                }
                 addBtn.disabled = false;
                 return;
             }
