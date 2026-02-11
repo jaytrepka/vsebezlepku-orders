@@ -158,8 +158,7 @@
             // Trigger mouseenter to show preview
             const event = new MouseEvent('mouseenter', {
                 bubbles: true,
-                cancelable: true,
-                view: window
+                cancelable: true
             });
             row.dispatchEvent(event);
 
@@ -178,8 +177,7 @@
             // Hide preview
             const leaveEvent = new MouseEvent('mouseleave', {
                 bubbles: true,
-                cancelable: true,
-                view: window
+                cancelable: true
             });
             row.dispatchEvent(leaveEvent);
 
@@ -199,8 +197,7 @@
                 // Trigger mouseenter
                 const event = new MouseEvent('mouseenter', {
                     bubbles: true,
-                    cancelable: true,
-                    view: window
+                    cancelable: true
                 });
                 row.dispatchEvent(event);
 
@@ -213,8 +210,7 @@
                     // Hide preview
                     const leaveEvent = new MouseEvent('mouseleave', {
                         bubbles: true,
-                        cancelable: true,
-                        view: window
+                        cancelable: true
                     });
                     row.dispatchEvent(leaveEvent);
 
