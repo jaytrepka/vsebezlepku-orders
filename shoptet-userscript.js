@@ -136,10 +136,19 @@
                 order.orderNumber = orderCodeEl.textContent.trim();
             }
 
-            // Find total price
-            const totalEl = doc.querySelector('.order-summary-total, .totalPrice');
-            if (totalEl) {
-                order.totalPrice = totalEl.textContent.trim();
+            // Find total price - look for "Částka k úhradě" value
+            const totalPriceEl = doc.querySelector('[data-testid="textTotalPriceWithVat"]');
+            if (totalPriceEl) {
+                order.totalPrice = totalPriceEl.textContent.trim();
+            } else {
+                // Fallback: look for preview-price or big element with price
+                const bigEl = doc.querySelector('big');
+                if (bigEl && bigEl.textContent.includes('Částka k úhradě')) {
+                    const priceMatch = bigEl.textContent.match(/[\d\s,]+\s*Kč/);
+                    if (priceMatch) {
+                        order.totalPrice = priceMatch[0].trim();
+                    }
+                }
             }
 
             // Find items from the products table - only rows that have a product link
