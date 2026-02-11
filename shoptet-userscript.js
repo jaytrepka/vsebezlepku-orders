@@ -116,9 +116,8 @@
         statusEl.style.color = isError ? '#f44336' : '#666';
     }
 
-    // Fetch order details from Shoptet API
+    // Fetch order details from Shoptet order detail page
     async function fetchOrderDetails(orderId) {
-        // Try to fetch order detail page and parse it
         try {
             const response = await fetch(`/admin/objednavky-detail/?id=${orderId}`);
             const html = await response.text();
@@ -131,37 +130,76 @@
                 items: []
             };
 
-            // Find order number
-            const orderCodeEl = doc.querySelector('.orderCode, [class*="orderCode"]');
+            // Find order number from the page
+            const orderCodeEl = doc.querySelector('.orderCode, [class*="orderCode"], strong.code');
             if (orderCodeEl) {
                 order.orderNumber = orderCodeEl.textContent.trim();
             }
 
             // Find total price
-            const totalEl = doc.querySelector('.order-summary-total, .totalPrice, [class*="total"]');
+            const totalEl = doc.querySelector('.order-summary-total, .totalPrice');
             if (totalEl) {
                 order.totalPrice = totalEl.textContent.trim();
             }
 
-            // Find items - look in the products table
-            const itemRows = doc.querySelectorAll('table tbody tr');
+            // Find items from the products table - only rows that have a product link
+            const itemRows = doc.querySelectorAll('table.checkbox-table tbody tr');
             itemRows.forEach(row => {
-                const productNameEl = row.querySelector('td a, td strong');
-                const quantityEl = row.querySelector('td.quantity, td:nth-child(4), td:nth-child(5)');
-                const priceEl = row.querySelector('td.price, td:last-child');
+                // Check if this is a product row by looking for product detail link
+                const codeCell = row.querySelector('td[data-testid="cellOrderItemCode"]');
+                const productLink = codeCell ? codeCell.querySelector('a[href*="/admin/produkty-detail/"]') : null;
                 
-                if (productNameEl) {
-                    const productName = productNameEl.textContent.trim().replace(/\s+/g, ' ');
-                    if (productName && productName.length > 3 && !productName.match(/^\d+$/)) {
-                        const quantity = quantityEl ? parseInt(quantityEl.textContent.replace(/\D/g, '')) || 1 : 1;
-                        order.items.push({
-                            productName,
-                            quantity,
-                            unitPrice: priceEl ? priceEl.textContent.trim() : null,
-                            productUrl: productNameEl.href || null
-                        });
+                // Skip non-product rows (shipping, payment methods, etc.)
+                if (!productLink) {
+                    return;
+                }
+
+                // Get product name from description cell
+                const descrCell = row.querySelector('td[data-testid="cellOrderItemDescr"]');
+                const nameLink = descrCell ? descrCell.querySelector('a.table__detailLink') : null;
+                
+                if (!nameLink) return;
+
+                // Extract just the product name, excluding manufacturer info
+                let productName = '';
+                const nameNode = nameLink.childNodes[0];
+                if (nameNode && nameNode.nodeType === Node.TEXT_NODE) {
+                    productName = nameNode.textContent.trim();
+                } else {
+                    // Fallback: get text before <br> or <span>
+                    productName = nameLink.innerHTML.split('<br')[0].split('<span')[0].trim();
+                    // Clean up any HTML entities
+                    const temp = document.createElement('div');
+                    temp.innerHTML = productName;
+                    productName = temp.textContent.trim();
+                }
+
+                if (!productName || productName.length < 3) return;
+
+                // Get quantity
+                const quantityCell = row.querySelector('td[data-testid="cellOrderItemAmount"]');
+                let quantity = 1;
+                if (quantityCell) {
+                    const quantityText = quantityCell.textContent.trim();
+                    const match = quantityText.match(/(\d+)/);
+                    if (match) {
+                        quantity = parseInt(match[1]) || 1;
                     }
                 }
+
+                // Get unit price
+                const priceCell = row.querySelector('td[data-testid="cellOrderItemPrice"]');
+                const unitPrice = priceCell ? priceCell.textContent.trim() : null;
+
+                // Get product URL
+                const productUrl = productLink.href || null;
+
+                order.items.push({
+                    productName,
+                    quantity,
+                    unitPrice,
+                    productUrl
+                });
             });
 
             return order;
