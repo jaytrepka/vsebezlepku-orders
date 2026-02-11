@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Shoptet LabelApp Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.2
 // @description  Import orders from Shoptet to LabelApp
 // @author       You
 // @match        https://*.shoptet.cz/admin/prehled-objednavek/*
@@ -9,6 +9,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      vsebezlepku-orders.vercel.app
 // @connect      localhost
+// @connect      vsebezlepku.cz
 // ==/UserScript==
 
 (function() {
@@ -17,6 +18,9 @@
     const LABEL_APP_URL = 'https://vsebezlepku-orders.vercel.app';
     // For local testing, uncomment this:
     // const LABEL_APP_URL = 'http://localhost:3000';
+
+    let isRunning = false;
+    let shouldStop = false;
 
     // Add custom styles
     const style = document.createElement('style');
@@ -39,6 +43,12 @@
         }
         .labelapp-btn.secondary:hover {
             background-color: #1976D2;
+        }
+        .labelapp-btn.danger {
+            background-color: #f44336;
+        }
+        .labelapp-btn.danger:hover {
+            background-color: #d32f2f;
         }
         .labelapp-btn:disabled {
             background-color: #cccccc;
@@ -83,6 +93,7 @@
     container.className = 'labelapp-container';
     container.innerHTML = `
         <button id="labelapp-add" class="labelapp-btn">Add into LabelApp</button>
+        <button id="labelapp-stop" class="labelapp-btn danger" style="display:none;">Stop</button>
         <button id="labelapp-update-btn" class="labelapp-btn secondary">Update order in LabelApp</button>
         <div id="labelapp-update-container" class="labelapp-input-container">
             <input type="text" id="labelapp-order-id" class="labelapp-input" placeholder="Order ID (e.g., O202500300)">
@@ -94,6 +105,7 @@
 
     const statusEl = document.getElementById('labelapp-status');
     const addBtn = document.getElementById('labelapp-add');
+    const stopBtn = document.getElementById('labelapp-stop');
     const updateBtn = document.getElementById('labelapp-update-btn');
     const updateContainer = document.getElementById('labelapp-update-container');
     const orderIdInput = document.getElementById('labelapp-order-id');
@@ -102,6 +114,61 @@
     function setStatus(msg, isError = false) {
         statusEl.textContent = msg;
         statusEl.style.color = isError ? '#f44336' : '#666';
+    }
+
+    // Fetch order details from Shoptet API
+    async function fetchOrderDetails(orderId) {
+        // Try to fetch order detail page and parse it
+        try {
+            const response = await fetch(`/admin/objednavky-detail/?id=${orderId}`);
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            const order = {
+                orderNumber: '',
+                totalPrice: '',
+                items: []
+            };
+
+            // Find order number
+            const orderCodeEl = doc.querySelector('.orderCode, [class*="orderCode"]');
+            if (orderCodeEl) {
+                order.orderNumber = orderCodeEl.textContent.trim();
+            }
+
+            // Find total price
+            const totalEl = doc.querySelector('.order-summary-total, .totalPrice, [class*="total"]');
+            if (totalEl) {
+                order.totalPrice = totalEl.textContent.trim();
+            }
+
+            // Find items - look in the products table
+            const itemRows = doc.querySelectorAll('table tbody tr');
+            itemRows.forEach(row => {
+                const productNameEl = row.querySelector('td a, td strong');
+                const quantityEl = row.querySelector('td.quantity, td:nth-child(4), td:nth-child(5)');
+                const priceEl = row.querySelector('td.price, td:last-child');
+                
+                if (productNameEl) {
+                    const productName = productNameEl.textContent.trim().replace(/\s+/g, ' ');
+                    if (productName && productName.length > 3 && !productName.match(/^\d+$/)) {
+                        const quantity = quantityEl ? parseInt(quantityEl.textContent.replace(/\D/g, '')) || 1 : 1;
+                        order.items.push({
+                            productName,
+                            quantity,
+                            unitPrice: priceEl ? priceEl.textContent.trim() : null,
+                            productUrl: productNameEl.href || null
+                        });
+                    }
+                }
+            });
+
+            return order;
+        } catch (e) {
+            console.error('Failed to fetch order details:', e);
+            return null;
+        }
     }
 
     // Parse order data from the preview popup
@@ -145,140 +212,75 @@
         return order;
     }
 
-    // Get all orders from the page by triggering hover on each row
-    async function getAllOrders() {
-        const orders = [];
-        const orderRows = document.querySelectorAll('table.checkbox-table tbody tr');
-
-        setStatus(`Found ${orderRows.length} order rows, scanning...`);
-
-        // Try to get order numbers directly from the page first (faster approach)
-        const orderLinks = document.querySelectorAll('a[href*="/admin/objednavky-detail/"]');
-        const foundOrderNumbers = new Set();
+    // Get all order IDs from the page
+    function getOrderIdsFromPage() {
+        const orderIds = [];
+        const orderNumbers = [];
         
-        orderLinks.forEach(link => {
-            // Extract order number from link text or nearby elements
-            const row = link.closest('tr');
-            if (row) {
-                const orderCodeEl = row.querySelector('strong.orderCode, .orderCode, td strong');
-                if (orderCodeEl) {
-                    const orderNum = orderCodeEl.textContent.trim();
-                    if (orderNum.match(/^O\d+$/)) {
-                        foundOrderNumbers.add(orderNum);
-                    }
+        // Find all order links and extract IDs
+        document.querySelectorAll('a[href*="/admin/objednavky-detail/"]').forEach(link => {
+            const match = link.href.match(/id=(\d+)/);
+            if (match) {
+                const id = match[1];
+                // Find order number nearby
+                const row = link.closest('tr');
+                if (row) {
+                    const strongEls = row.querySelectorAll('strong');
+                    strongEls.forEach(el => {
+                        const text = el.textContent.trim();
+                        if (text.match(/^O\d{9,}$/)) {
+                            if (!orderNumbers.includes(text)) {
+                                orderIds.push({ id, orderNumber: text });
+                                orderNumbers.push(text);
+                            }
+                        }
+                    });
                 }
             }
         });
 
-        // Alternative: look for order numbers in strong tags
-        if (foundOrderNumbers.size === 0) {
-            document.querySelectorAll('table tbody tr').forEach(row => {
-                const strongEls = row.querySelectorAll('strong');
-                strongEls.forEach(el => {
-                    const text = el.textContent.trim();
-                    if (text.match(/^O\d{9,}$/)) {
-                        foundOrderNumbers.add(text);
-                    }
-                });
-            });
+        return orderIds;
+    }
+
+    // Get all orders from the page
+    async function getAllOrders(existingOrderNumbers) {
+        const orders = [];
+        const orderInfos = getOrderIdsFromPage();
+
+        setStatus(`Found ${orderInfos.length} orders on page, checking for new ones...`);
+
+        // Filter to only new orders first
+        const newOrderInfos = orderInfos.filter(o => !existingOrderNumbers.includes(o.orderNumber));
+        
+        if (newOrderInfos.length === 0) {
+            return [];
         }
 
-        setStatus(`Found ${foundOrderNumbers.size} order numbers directly, now fetching details...`);
+        setStatus(`Found ${newOrderInfos.length} new orders, fetching details...`);
 
-        // For each order, trigger hover to get items
-        for (let i = 0; i < orderRows.length; i++) {
-            const row = orderRows[i];
-            
-            // Check if this row has an order number
-            const strongEls = row.querySelectorAll('strong');
-            let rowOrderNum = null;
-            strongEls.forEach(el => {
-                const text = el.textContent.trim();
-                if (text.match(/^O\d{9,}$/)) {
-                    rowOrderNum = text;
-                }
-            });
-
-            if (!rowOrderNum) continue;
-
-            // Trigger mouseenter to show preview
-            const event = new MouseEvent('mouseenter', {
-                bubbles: true,
-                cancelable: true
-            });
-            row.dispatchEvent(event);
-
-            // Also try jQuery trigger if available
-            if (typeof $ !== 'undefined') {
-                try { $(row).trigger('mouseenter'); } catch(e) {}
+        for (let i = 0; i < newOrderInfos.length; i++) {
+            if (shouldStop) {
+                setStatus('Stopped by user');
+                break;
             }
 
-            // Wait for preview to appear
-            await new Promise(resolve => setTimeout(resolve, 400));
+            const info = newOrderInfos[i];
+            setStatus(`Fetching ${i + 1}/${newOrderInfos.length}: ${info.orderNumber}...`);
 
-            // Find the preview popup
-            const preview = document.getElementById('item-preview');
-            if (preview && preview.style.display !== 'none' && preview.innerHTML.length > 100) {
-                const order = parseOrderFromPreview(preview);
-                if (order.orderNumber && order.items.length > 0) {
-                    orders.push(order);
-                    console.log('Parsed order:', order.orderNumber, 'with', order.items.length, 'items');
-                } else if (rowOrderNum) {
-                    // Fallback: add order with just the number if preview parsing failed
-                    console.log('Preview found but parsing failed for:', rowOrderNum);
-                }
-            } else if (rowOrderNum) {
-                console.log('No preview for order:', rowOrderNum);
+            const order = await fetchOrderDetails(info.id);
+            if (order && order.items.length > 0) {
+                order.orderNumber = info.orderNumber; // Use the order number we found
+                orders.push(order);
+                console.log('Fetched order:', info.orderNumber, 'with', order.items.length, 'items');
+            } else {
+                console.log('Failed to fetch or parse order:', info.orderNumber);
             }
 
-            // Hide preview
-            const leaveEvent = new MouseEvent('mouseleave', {
-                bubbles: true,
-                cancelable: true
-            });
-            row.dispatchEvent(leaveEvent);
-
-            setStatus(`Scanned ${i + 1}/${orderRows.length} orders...`);
+            // Small delay to avoid hammering the server
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
         return orders;
-    }
-
-    // Get single order by triggering hover
-    async function getOrderByNumber(orderNumber) {
-        const orderRows = document.querySelectorAll('table.checkbox-table tbody tr');
-
-        for (const row of orderRows) {
-            // Check if this row contains the order number
-            if (row.textContent.includes(orderNumber)) {
-                // Trigger mouseenter
-                const event = new MouseEvent('mouseenter', {
-                    bubbles: true,
-                    cancelable: true
-                });
-                row.dispatchEvent(event);
-
-                await new Promise(resolve => setTimeout(resolve, 300));
-
-                const preview = document.getElementById('item-preview');
-                if (preview) {
-                    const order = parseOrderFromPreview(preview);
-
-                    // Hide preview
-                    const leaveEvent = new MouseEvent('mouseleave', {
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    row.dispatchEvent(leaveEvent);
-
-                    if (order.orderNumber === orderNumber) {
-                        return order;
-                    }
-                }
-            }
-        }
-
-        return null;
     }
 
     // Fetch existing order numbers from LabelApp
@@ -327,9 +329,20 @@
         });
     }
 
+    // Stop button handler
+    stopBtn.addEventListener('click', () => {
+        shouldStop = true;
+        setStatus('Stopping...');
+    });
+
     // Add new orders button handler
     addBtn.addEventListener('click', async () => {
+        if (isRunning) return;
+        
+        isRunning = true;
+        shouldStop = false;
         addBtn.disabled = true;
+        stopBtn.style.display = 'block';
         setStatus('Fetching existing orders from LabelApp...');
 
         try {
@@ -337,22 +350,22 @@
             const existingOrderNumbers = await getExistingOrderNumbers();
             setStatus(`Found ${existingOrderNumbers.length} existing orders in LabelApp`);
 
-            // Get all orders from page
-            const allOrders = await getAllOrders();
-            console.log('All parsed orders:', allOrders.map(o => o.orderNumber));
-            setStatus(`Parsed ${allOrders.length} orders with items from Shoptet`);
+            // Get all orders from page (only new ones)
+            const newOrders = await getAllOrders(existingOrderNumbers);
+            console.log('Orders to add:', newOrders.map(o => o.orderNumber));
 
-            // Filter out existing orders
-            const newOrders = allOrders.filter(o => !existingOrderNumbers.includes(o.orderNumber));
-            console.log('New orders to add:', newOrders.map(o => o.orderNumber));
+            if (shouldStop) {
+                addBtn.disabled = false;
+                stopBtn.style.display = 'none';
+                isRunning = false;
+                return;
+            }
 
             if (newOrders.length === 0) {
-                if (allOrders.length === 0) {
-                    setStatus('Could not parse any orders. Check browser console for details.');
-                } else {
-                    setStatus(`No new orders to add. All ${allOrders.length} orders already exist in LabelApp.`);
-                }
+                setStatus('No new orders to add.');
                 addBtn.disabled = false;
+                stopBtn.style.display = 'none';
+                isRunning = false;
                 return;
             }
 
@@ -375,6 +388,8 @@
         }
 
         addBtn.disabled = false;
+        stopBtn.style.display = 'none';
+        isRunning = false;
     });
 
     // Toggle update input container
@@ -397,14 +412,26 @@
         setStatus(`Looking for order ${orderNumber}...`);
 
         try {
-            const order = await getOrderByNumber(orderNumber);
+            // Find order ID from page
+            const orderInfos = getOrderIdsFromPage();
+            const info = orderInfos.find(o => o.orderNumber === orderNumber);
 
-            if (!order) {
+            if (!info) {
                 setStatus(`Order ${orderNumber} not found on this page`, true);
                 updateConfirmBtn.disabled = false;
                 return;
             }
 
+            setStatus(`Fetching order details...`);
+            const order = await fetchOrderDetails(info.id);
+
+            if (!order || order.items.length === 0) {
+                setStatus(`Could not fetch order details`, true);
+                updateConfirmBtn.disabled = false;
+                return;
+            }
+
+            order.orderNumber = orderNumber;
             setStatus(`Found order with ${order.items.length} items. Updating...`);
 
             const result = await sendOrdersToLabelApp([order]);
