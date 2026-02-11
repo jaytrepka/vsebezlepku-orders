@@ -12,7 +12,7 @@ export async function GET() {
         },
       },
       orderBy: {
-        emailDate: "desc",
+        orderNumber: "desc",
       },
     });
 
