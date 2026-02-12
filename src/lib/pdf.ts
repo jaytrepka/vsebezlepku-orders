@@ -20,20 +20,22 @@ async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }>
   };
 }
 
-// A4 dimensions in points - LANDSCAPE
-const A4_WIDTH = 841.89;
-const A4_HEIGHT = 595.28;
-
-// Label dimensions: 36mm x 70mm
+// Label dimensions: 37mm x 70mm (no margins, paper fully covered)
 const MM_TO_PT = 2.83465;
-const LABEL_WIDTH = 36 * MM_TO_PT;
+const LABEL_WIDTH = 37 * MM_TO_PT;
 const LABEL_HEIGHT = 70 * MM_TO_PT;
 
 // Grid: 8 columns x 3 rows = 24 labels
 const COLS = 8;
 const ROWS = 3;
-const MARGIN_X = (A4_WIDTH - COLS * LABEL_WIDTH) / 2;
-const MARGIN_Y = (A4_HEIGHT - ROWS * LABEL_HEIGHT) / 2;
+
+// Page size exactly fits labels with no margins
+const PAGE_WIDTH = COLS * LABEL_WIDTH;
+const PAGE_HEIGHT = ROWS * LABEL_HEIGHT;
+
+// No margins - labels start from edge
+const MARGIN_X = 0;
+const MARGIN_Y = 0;
 
 export interface LabelData {
   nazev: string;
@@ -632,7 +634,7 @@ export async function generateLabelsPDF(
   let labelIndex = 0;
 
   for (let pageNum = 0; pageNum < totalPages; pageNum++) {
-    const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
@@ -645,7 +647,7 @@ export async function generateLabelsPDF(
         labelIndex++;
 
         const x = MARGIN_X + col * LABEL_WIDTH;
-        const y = A4_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
+        const y = PAGE_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
 
         drawLabel(page, label, x, y, font, fontBold, headers);
       }
