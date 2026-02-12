@@ -20,7 +20,7 @@ async function loadFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer }>
   };
 }
 
-// Label dimensions: 37mm x 70mm (no margins, paper fully covered)
+// Label dimensions: 37mm x 70mm
 const MM_TO_PT = 2.83465;
 const LABEL_WIDTH = 37 * MM_TO_PT;
 const LABEL_HEIGHT = 70 * MM_TO_PT;
@@ -29,13 +29,13 @@ const LABEL_HEIGHT = 70 * MM_TO_PT;
 const COLS = 8;
 const ROWS = 3;
 
-// Page size exactly fits labels with no margins
-const PAGE_WIDTH = COLS * LABEL_WIDTH;
-const PAGE_HEIGHT = ROWS * LABEL_HEIGHT;
+// Printer margins: 4mm left/right, 6mm top/bottom
+const MARGIN_X = 4 * MM_TO_PT;
+const MARGIN_Y = 6 * MM_TO_PT;
 
-// No margins - labels start from edge
-const MARGIN_X = 0;
-const MARGIN_Y = 0;
+// Page size: labels + margins
+const PAGE_WIDTH = COLS * LABEL_WIDTH + 2 * MARGIN_X;
+const PAGE_HEIGHT = ROWS * LABEL_HEIGHT + 2 * MARGIN_Y;
 
 export interface LabelData {
   nazev: string;
