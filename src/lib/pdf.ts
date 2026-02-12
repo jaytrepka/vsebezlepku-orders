@@ -29,13 +29,17 @@ const LABEL_HEIGHT = 70 * MM_TO_PT;
 const COLS = 8;
 const ROWS = 3;
 
-// Printer margins: 4mm left/right, 6mm top/bottom
-const MARGIN_X = 4 * MM_TO_PT;
-const MARGIN_Y = 6 * MM_TO_PT;
+// A4 page size (landscape)
+const PAGE_WIDTH = 297 * MM_TO_PT;
+const PAGE_HEIGHT = 210 * MM_TO_PT;
 
-// Page size: labels + margins
-const PAGE_WIDTH = COLS * LABEL_WIDTH + 2 * MARGIN_X;
-const PAGE_HEIGHT = ROWS * LABEL_HEIGHT + 2 * MARGIN_Y;
+// Center labels on page
+const MARGIN_X = (PAGE_WIDTH - COLS * LABEL_WIDTH) / 2;
+const MARGIN_Y = (PAGE_HEIGHT - ROWS * LABEL_HEIGHT) / 2;
+
+// Printer margins (content inset for edge labels)
+const PRINTER_MARGIN_X = 4 * MM_TO_PT;  // left/right
+const PRINTER_MARGIN_Y = 6 * MM_TO_PT;  // top/bottom
 
 export interface LabelData {
   nazev: string;
@@ -335,19 +339,22 @@ function drawLabel(
   y: number,
   font: PDFFont,
   fontBold: PDFFont,
-  headers: typeof labelHeaders["cs"]
+  headers: typeof labelHeaders["cs"],
+  printerPadding: { left: number; right: number; top: number; bottom: number } = { left: 0, right: 0, top: 0, bottom: 0 }
 ) {
   const padding = 3;
-  const contentWidth = LABEL_WIDTH - 2 * padding;
-  const contentHeight = LABEL_HEIGHT - 2 * padding;
+  // Adjust content area for printer margins on edge labels
+  const contentX = x + padding + printerPadding.left;
+  const contentWidth = LABEL_WIDTH - 2 * padding - printerPadding.left - printerPadding.right;
+  const contentHeight = LABEL_HEIGHT - 2 * padding - printerPadding.top - printerPadding.bottom;
   const borderColor = rgb(0, 0, 0);
   
-  // Draw border
+  // Draw border (adjusted for printer padding)
   page.drawRectangle({
-    x: x + padding,
-    y: y + padding,
-    width: LABEL_WIDTH - 2 * padding,
-    height: LABEL_HEIGHT - 2 * padding,
+    x: x + padding + printerPadding.left,
+    y: y + padding + printerPadding.bottom,
+    width: LABEL_WIDTH - 2 * padding - printerPadding.left - printerPadding.right,
+    height: LABEL_HEIGHT - 2 * padding - printerPadding.top - printerPadding.bottom,
     borderColor,
     borderWidth: 0.5,
     color: rgb(1, 1, 1),
@@ -359,19 +366,19 @@ function drawLabel(
   const titleSize = fontSize + 1;
   const titleLineHeight = titleSize * 1.15;
   
-  let currentY = y + LABEL_HEIGHT - padding - 1;
-  const textX = x + padding + 2;
+  let currentY = y + LABEL_HEIGHT - padding - printerPadding.top - 1;
+  const textX = contentX + 2;
   const maxTextWidth = contentWidth - 4;
   
   // === NÁZEV (title, bold, centered, with grey background) ===
   const titleLines = wrapTextWithFont(label.nazev, maxTextWidth, titleSize, fontBold);
   const titleBlockHeight = titleLines.length * titleLineHeight + 2;
   
-  // Draw grey background for title
+  // Draw grey background for title (within content area)
   page.drawRectangle({
-    x: x + padding,
+    x: contentX,
     y: currentY - titleBlockHeight,
-    width: LABEL_WIDTH - 2 * padding,
+    width: contentWidth,
     height: titleBlockHeight,
     color: rgb(0.92, 0.92, 0.92),
   });
@@ -380,7 +387,7 @@ function drawLabel(
     currentY -= titleLineHeight;
     const lineWidth = fontBold.widthOfTextAtSize(line, titleSize);
     page.drawText(line, {
-      x: x + (LABEL_WIDTH - lineWidth) / 2,
+      x: contentX + (contentWidth - lineWidth) / 2,
       y: currentY,
       size: titleSize,
       font: fontBold,
@@ -391,8 +398,8 @@ function drawLabel(
   // Separator line after title
   currentY -= 2;
   page.drawLine({
-    start: { x: x + padding, y: currentY },
-    end: { x: x + LABEL_WIDTH - padding, y: currentY },
+    start: { x: contentX, y: currentY },
+    end: { x: contentX + contentWidth, y: currentY },
     color: borderColor,
     thickness: 0.3,
   });
@@ -480,8 +487,8 @@ function drawLabel(
   
   // Separator line after Složení
   page.drawLine({
-    start: { x: x + padding, y: currentY },
-    end: { x: x + LABEL_WIDTH - padding, y: currentY },
+    start: { x: contentX, y: currentY },
+    end: { x: contentX + contentWidth, y: currentY },
     color: borderColor,
     thickness: 0.3,
   });
@@ -531,8 +538,8 @@ function drawLabel(
   
   // Separator line after Nutriční hodnoty
   page.drawLine({
-    start: { x: x + padding, y: currentY },
-    end: { x: x + LABEL_WIDTH - padding, y: currentY },
+    start: { x: contentX, y: currentY },
+    end: { x: contentX + contentWidth, y: currentY },
     color: borderColor,
     thickness: 0.3,
   });
@@ -556,8 +563,8 @@ function drawLabel(
     
     // Separator line after Info
     page.drawLine({
-      start: { x: x + padding, y: currentY },
-      end: { x: x + LABEL_WIDTH - padding, y: currentY },
+      start: { x: contentX, y: currentY },
+      end: { x: contentX + contentWidth, y: currentY },
       color: borderColor,
       thickness: 0.3,
     });
@@ -649,7 +656,15 @@ export async function generateLabelsPDF(
         const x = MARGIN_X + col * LABEL_WIDTH;
         const y = PAGE_HEIGHT - MARGIN_Y - (row + 1) * LABEL_HEIGHT;
 
-        drawLabel(page, label, x, y, font, fontBold, headers);
+        // Calculate printer padding for edge labels
+        const printerPadding = {
+          left: col === 0 ? PRINTER_MARGIN_X : 0,
+          right: col === COLS - 1 ? PRINTER_MARGIN_X : 0,
+          top: row === 0 ? PRINTER_MARGIN_Y : 0,
+          bottom: row === ROWS - 1 ? PRINTER_MARGIN_Y : 0,
+        };
+
+        drawLabel(page, label, x, y, font, fontBold, headers, printerPadding);
       }
     }
   }
