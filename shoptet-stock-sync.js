@@ -18,7 +18,7 @@
     // For local testing, uncomment this:
     // const APP_URL = 'http://localhost:3000';
 
-    let debounceTimer = null;
+    let debounceTimer = null; // kept for potential future use
 
     console.log("VšeBezLepku Expirace: Script v1.0 spuštěn.");
 
@@ -222,21 +222,9 @@
         }
     }
 
-    // Auto-process new rows added to DOM
-    const observer = new MutationObserver(() => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            createRefreshButton();
-            processRows(false);
-        }, 1000);
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Initial load
+    // Auto-create button when page loads, no auto-sync
     setTimeout(() => {
         createRefreshButton();
-        processRows(false);
     }, 1500);
 
 })();
