@@ -368,13 +368,17 @@ export default function StockPage() {
                     </td>
                     <td className="px-4 py-3">
                       {addingTo !== product.id && (
-                        <button
-                          onClick={() => { setAddingTo(product.id); setNewExpDate(""); setNewExpCount(""); }}
-                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 flex items-center gap-1 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Datum
-                        </button>
+                        unassigned > 0 ? (
+                          <button
+                            onClick={() => { setAddingTo(product.id); setNewExpDate(""); setNewExpCount(""); }}
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Datum
+                          </button>
+                        ) : (
+                          <span className="text-green-600" title="Všechna data zadána">✓</span>
+                        )
                       )}
                     </td>
                   </tr>
