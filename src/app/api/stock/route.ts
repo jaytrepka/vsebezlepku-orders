@@ -49,9 +49,10 @@ export async function POST(request: NextRequest) {
       for (const item of data.items) {
         const productName = item.name;
         const totalCount = parseInt(item.stock, 10);
+        const code = item.code || null;
         if (!productName || isNaN(totalCount)) continue;
 
-        const product = await upsertProduct(productName, totalCount);
+        const product = await upsertProduct(productName, totalCount, code);
         const expirations = product.expirations || [];
 
         results[item.code] = {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "productName and totalCount required" }, { status: 400 });
     }
 
-    const product = await upsertProduct(productName, totalCount);
+    const product = await upsertProduct(productName, totalCount, data.code || null);
     return NextResponse.json(product);
   } catch (error) {
     console.error("Stock upsert error:", error);
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function upsertProduct(productName: string, totalCount: number) {
+async function upsertProduct(productName: string, totalCount: number, code: string | null = null) {
   const existing = await prisma.stockProduct.findUnique({
     where: { productName },
     include: { expirations: { orderBy: { expirationDate: "asc" } } },
@@ -93,7 +94,7 @@ async function upsertProduct(productName: string, totalCount: number) {
 
   if (!existing) {
     return await prisma.stockProduct.create({
-      data: { productName, totalCount },
+      data: { productName, totalCount, code },
       include: { expirations: true },
     });
   }
@@ -118,9 +119,12 @@ async function upsertProduct(productName: string, totalCount: number) {
     }
   }
 
+  const updateData: { totalCount: number; code?: string } = { totalCount };
+  if (code) updateData.code = code;
+
   return await prisma.stockProduct.update({
     where: { productName },
-    data: { totalCount },
+    data: updateData,
     include: { expirations: { orderBy: { expirationDate: "asc" } } },
   });
 }

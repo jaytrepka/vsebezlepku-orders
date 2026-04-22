@@ -50,6 +50,7 @@ model ProductLabel {
 model StockProduct {
   id          String           @id @default(cuid())
   productName String           @unique
+  code        String?
   totalCount  Int              @default(0)
   expirations ExpirationDate[]
   createdAt   DateTime         @default(now())
