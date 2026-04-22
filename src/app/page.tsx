@@ -256,6 +256,22 @@ export default function Home() {
     );
   }
 
+  function excludeAllItems(orderId: string) {
+    const order = orders.find((o) => o.id === orderId);
+    if (order) {
+      const itemIds = order.items.map((i) => i.id);
+      setExcludedItems((prev) => [...new Set([...prev, ...itemIds])]);
+    }
+  }
+
+  function includeAllItems(orderId: string) {
+    const order = orders.find((o) => o.id === orderId);
+    if (order) {
+      const itemIds = order.items.map((i) => i.id);
+      setExcludedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
+    }
+  }
+
   function selectAll() {
     if (selectedOrders.length === orders.length) {
       setSelectedOrders([]);
@@ -438,8 +454,7 @@ export default function Home() {
                     type="checkbox"
                     checked={selectedOrders.length === orders.length && orders.length > 0}
                     onChange={selectAll}
-                    className="rounded"
-                  />
+                    className="rounded w-5 h-5 cursor-pointer"                  />
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
                   Č. objednávky
@@ -468,7 +483,7 @@ export default function Home() {
                       type="checkbox"
                       checked={selectedOrders.includes(order.id)}
                       onChange={() => toggleOrder(order.id)}
-                      className="rounded"
+                      className="rounded w-5 h-5 cursor-pointer"
                     />
                   </td>
                   <td className="px-4 py-3 font-mono text-sm">
@@ -479,6 +494,23 @@ export default function Home() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="space-y-1">
+                      {selectedOrders.includes(order.id) && order.items.length > 1 && (
+                        <div className="flex gap-2 mb-1">
+                          <button
+                            onClick={() => includeAllItems(order.id)}
+                            className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
+                          >
+                            Vybrat vše
+                          </button>
+                          <span className="text-xs text-gray-300">|</span>
+                          <button
+                            onClick={() => excludeAllItems(order.id)}
+                            className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
+                          >
+                            Zrušit vše
+                          </button>
+                        </div>
+                      )}
                       {order.items.map((item) => (
                         <div
                           key={item.id}
@@ -491,12 +523,12 @@ export default function Home() {
                               type="checkbox"
                               checked={!excludedItems.includes(item.id)}
                               onChange={() => toggleItem(item.id)}
-                              className="rounded w-4 h-4"
+                              className="rounded w-5 h-5 min-w-5 cursor-pointer"
                               title="Zahrnout do tisku"
                             />
                           )}
-                          <span className="font-medium">{item.quantity}×</span>
-                          <span className="truncate max-w-xs">
+                          <span className="font-medium whitespace-nowrap">{item.quantity}×</span>
+                          <span className="break-words" title={item.productName}>
                             {item.productName}
                           </span>
                           {(() => {
