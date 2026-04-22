@@ -46,6 +46,8 @@ export default function StockPage() {
   const [editingExp, setEditingExp] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editCount, setEditCount] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "name" | "count">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     fetchProducts();
@@ -145,6 +147,40 @@ export default function StockPage() {
     setEditCount(String(exp.count));
   }
 
+  function handleSort(column: "date" | "name" | "count") {
+    if (sortBy === column) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(column);
+      setSortDir("asc");
+    }
+  }
+
+  function getSortIndicator(column: "date" | "name" | "count") {
+    if (sortBy !== column) return " ↕";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  }
+
+  const sortedProducts = [...products].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortBy === "name") {
+      return dir * a.productName.localeCompare(b.productName, "cs");
+    }
+    if (sortBy === "count") {
+      return dir * (a.totalCount - b.totalCount);
+    }
+    // date: sort by earliest expiration
+    const aDate = a.expirations[0]?.expirationDate;
+    const bDate = b.expirations[0]?.expirationDate;
+    if (!aDate && !bDate) return 0;
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+    return dir * (new Date(aDate).getTime() - new Date(bDate).getTime());
+  });
+
+  const totalProducts = products.length;
+  const totalPieces = products.reduce((sum, p) => sum + p.totalCount, 0);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -156,6 +192,11 @@ export default function StockPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Přehled skladových zásob a dat trvanlivosti
+            {totalProducts > 0 && (
+              <span className="ml-3 font-medium text-gray-700">
+                — {totalProducts} produktů, {totalPieces} ks celkem
+              </span>
+            )}
           </p>
         </div>
       </header>
@@ -178,14 +219,29 @@ export default function StockPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Produkt</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 w-24">Ks celkem</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Trvanlivosti</th>
+                <th
+                  className="px-4 py-3 text-left text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none"
+                  onClick={() => handleSort("name")}
+                >
+                  Produkt{getSortIndicator("name")}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-sm font-medium text-gray-600 w-24 cursor-pointer hover:text-gray-900 select-none"
+                  onClick={() => handleSort("count")}
+                >
+                  Ks celkem{getSortIndicator("count")}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none"
+                  onClick={() => handleSort("date")}
+                >
+                  Trvanlivosti{getSortIndicator("date")}
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 w-20">Akce</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {products.map((product) => {
+              {sortedProducts.map((product) => {
                 const assignedCount = product.expirations.reduce((sum, e) => sum + e.count, 0);
                 const unassigned = product.totalCount - assignedCount;
 
