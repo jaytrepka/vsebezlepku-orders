@@ -29,60 +29,55 @@ export async function GET() {
   }
 }
 
-// POST - Upsert product (used by Tampermonkey script)
-// Body: { productName: string, totalCount: number }
+// POST - Upsert product(s) (used by Tampermonkey script)
+// Supports single: { productName: string, totalCount: number }
+// Supports batch: { items: [{ name: string, stock: string, code: string }, ...] }
 // If count decreased, subtract from soonest-expiring batches first (FIFO)
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { productName, totalCount } = data;
 
+    // Batch mode (from Tampermonkey)
+    if (data.items && Array.isArray(data.items)) {
+      const results: Record<string, {
+        found: boolean;
+        totalCount: number;
+        earliest: { date: string; count: number } | null;
+        expirations: { date: string; count: number; neplytvatConfirmed: boolean }[];
+      }> = {};
+
+      for (const item of data.items) {
+        const productName = item.name;
+        const totalCount = parseInt(item.stock, 10);
+        if (!productName || isNaN(totalCount)) continue;
+
+        const product = await upsertProduct(productName, totalCount);
+        const expirations = product.expirations || [];
+
+        results[item.code] = {
+          found: expirations.length > 0,
+          totalCount: product.totalCount,
+          earliest: expirations.length > 0
+            ? { date: expirations[0].expirationDate.toISOString(), count: expirations[0].count }
+            : null,
+          expirations: expirations.map((e) => ({
+            date: e.expirationDate.toISOString(),
+            count: e.count,
+            neplytvatConfirmed: e.neplytvatConfirmed,
+          })),
+        };
+      }
+
+      return NextResponse.json(results);
+    }
+
+    // Single mode
+    const { productName, totalCount } = data;
     if (!productName || totalCount === undefined) {
       return NextResponse.json({ error: "productName and totalCount required" }, { status: 400 });
     }
 
-    const existing = await prisma.stockProduct.findUnique({
-      where: { productName },
-      include: { expirations: { orderBy: { expirationDate: "asc" } } },
-    });
-
-    if (!existing) {
-      // Create new product
-      const product = await prisma.stockProduct.create({
-        data: { productName, totalCount },
-        include: { expirations: true },
-      });
-      return NextResponse.json(product);
-    }
-
-    // Update existing product
-    const oldCount = existing.totalCount;
-    const diff = oldCount - totalCount;
-
-    if (diff > 0) {
-      // Count decreased — subtract from soonest-expiring batches (FIFO)
-      let remaining = diff;
-      for (const exp of existing.expirations) {
-        if (remaining <= 0) break;
-        if (exp.count <= remaining) {
-          remaining -= exp.count;
-          await prisma.expirationDate.delete({ where: { id: exp.id } });
-        } else {
-          await prisma.expirationDate.update({
-            where: { id: exp.id },
-            data: { count: exp.count - remaining },
-          });
-          remaining = 0;
-        }
-      }
-    }
-
-    const product = await prisma.stockProduct.update({
-      where: { productName },
-      data: { totalCount },
-      include: { expirations: { orderBy: { expirationDate: "asc" } } },
-    });
-
+    const product = await upsertProduct(productName, totalCount);
     return NextResponse.json(product);
   } catch (error) {
     console.error("Stock upsert error:", error);
@@ -90,5 +85,42 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// POST with batch: [{productName, totalCount}, ...]
-// Also supports single object for backward compat
+async function upsertProduct(productName: string, totalCount: number) {
+  const existing = await prisma.stockProduct.findUnique({
+    where: { productName },
+    include: { expirations: { orderBy: { expirationDate: "asc" } } },
+  });
+
+  if (!existing) {
+    return await prisma.stockProduct.create({
+      data: { productName, totalCount },
+      include: { expirations: true },
+    });
+  }
+
+  const diff = existing.totalCount - totalCount;
+
+  if (diff > 0) {
+    // Count decreased — subtract from soonest-expiring batches (FIFO)
+    let remaining = diff;
+    for (const exp of existing.expirations) {
+      if (remaining <= 0) break;
+      if (exp.count <= remaining) {
+        remaining -= exp.count;
+        await prisma.expirationDate.delete({ where: { id: exp.id } });
+      } else {
+        await prisma.expirationDate.update({
+          where: { id: exp.id },
+          data: { count: exp.count - remaining },
+        });
+        remaining = 0;
+      }
+    }
+  }
+
+  return await prisma.stockProduct.update({
+    where: { productName },
+    data: { totalCount },
+    include: { expirations: { orderBy: { expirationDate: "asc" } } },
+  });
+}
