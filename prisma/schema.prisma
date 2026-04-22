@@ -46,3 +46,23 @@ model ProductLabel {
 
   @@unique([productName, language])
 }
+
+model StockProduct {
+  id          String           @id @default(cuid())
+  productName String           @unique
+  totalCount  Int              @default(0)
+  expirations ExpirationDate[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model ExpirationDate {
+  id                 String       @id @default(cuid())
+  stockProductId     String
+  expirationDate     DateTime
+  count              Int
+  neplytvatConfirmed Boolean      @default(false)
+  stockProduct       StockProduct @relation(fields: [stockProductId], references: [id], onDelete: Cascade)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
