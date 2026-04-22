@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, Mail, FileText, Plus, Trash2, Printer, Edit2 } from "lucide-react";
+import { Package, FileText, Plus, Trash2, Printer, Edit2 } from "lucide-react";
 
 interface ProductLabel {
   id: string;
@@ -36,9 +36,7 @@ export default function Home() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
-  const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [daysBack, setDaysBack] = useState(30);
   const [startPosition, setStartPosition] = useState(1);
   const [labelModal, setLabelModal] = useState<{
     open: boolean;
@@ -66,15 +64,27 @@ export default function Home() {
   };
 
   // Get label for product in selected language
+  function normalizeProductName(name: string): string {
+    return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "").trim();
+  }
+
   function getLabelForProduct(item: OrderItem): ProductLabel | null {
     if (labelLanguage === "cs") {
       return item.label || null;
     }
-    // For other languages, look up by Czech label's productName
+    // For other languages, try multiple lookups:
+    // 1. By Czech label's productName (exact)
+    // 2. By Czech label's productName (normalized, without "Pomozte neplýtvat")
+    // 3. By item's productName (exact)
+    // 4. By item's productName (normalized)
     if (item.label) {
-      return languageLabels.get(item.label.productName) || null;
+      const found = languageLabels.get(item.label.productName)
+        || languageLabels.get(normalizeProductName(item.label.productName));
+      if (found) return found;
     }
-    return null;
+    return languageLabels.get(item.productName)
+      || languageLabels.get(normalizeProductName(item.productName))
+      || null;
   }
 
   // Calculate total items to print (from selected orders, excluding unchecked items and items without labels in selected language)
@@ -85,7 +95,6 @@ export default function Home() {
     .reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
-    checkAuth();
     fetchOrders();
   }, []);
 
@@ -129,43 +138,12 @@ export default function Home() {
     }
   }
 
-  async function checkAuth() {
-    const res = await fetch("/api/gmail");
-    const data = await res.json();
-    setAuthenticated(data.authenticated);
-  }
-
   async function fetchOrders() {
     const res = await fetch("/api/orders");
     const data = await res.json();
     if (Array.isArray(data)) {
       setOrders(data);
     }
-  }
-
-  async function syncEmails() {
-    setLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/gmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ daysBack }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setMessage({ type: "error", text: data.error });
-      } else {
-        setMessage({
-          type: "success",
-          text: `Nalezeno: ${data.found}, Uloženo: ${data.saved}, Přeskočeno: ${data.skipped}`,
-        });
-        fetchOrders();
-      }
-    } catch {
-      setMessage({ type: "error", text: "Chyba při synchronizaci" });
-    }
-    setLoading(false);
   }
 
   async function deleteOrders() {
@@ -249,6 +227,9 @@ export default function Home() {
       vyrobce: "",
     });
     fetchOrders();
+    if (labelLanguage !== "cs") {
+      fetchLanguageLabels();
+    }
   }
 
   function toggleOrder(orderId: string) {
@@ -380,17 +361,6 @@ export default function Home() {
               <Package className="w-7 h-7 text-blue-600" />
               VšeBezLepku Objednávky
             </h1>
-            {!authenticated ? (
-              <a
-                href="/api/auth"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Mail className="w-4 h-4" />
-                Připojit Gmail
-              </a>
-            ) : (
-              <span className="text-green-600 font-medium">✓ Gmail připojen</span>
-            )}
           </div>
         </div>
       </header>
@@ -411,28 +381,6 @@ export default function Home() {
       {/* Controls */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Dní zpět:</label>
-            <input
-              type="number"
-              value={daysBack}
-              onChange={(e) => setDaysBack(Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1"
-              min={1}
-              max={365}
-            />
-          </div>
-          <button
-            onClick={syncEmails}
-            disabled={!authenticated || loading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            <Mail className="w-4 h-4" />
-            {loading ? "Načítám..." : "Synchronizovat emaily"}
-          </button>
-
-          <div className="flex-1" />
-
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Jazyk štítků:</label>
             <select
@@ -597,18 +545,11 @@ export default function Home() {
                                 </button>
                               );
                             } else {
-                              // Other language: need Czech label first, then show translation status
-                              if (!hasCzechLabel) {
-                                return (
-                                  <span className="text-xs text-gray-400 px-2 py-0.5">
-                                    (chybí CZ štítek)
-                                  </span>
-                                );
-                              }
+                              // Other language: show translation status
                               return langLabel ? (
                                 <>
                                   <button
-                                    onClick={() => openLabelModal(item.label!.productName, langLabel, item.productUrl, labelLanguage)}
+                                    onClick={() => openLabelModal(langLabel.productName, langLabel, item.productUrl, labelLanguage)}
                                     className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded hover:bg-green-200 flex items-center gap-1 cursor-pointer"
                                   >
                                     <Edit2 className="w-3 h-3" />
@@ -627,7 +568,7 @@ export default function Home() {
                                 </>
                               ) : (
                                 <button
-                                  onClick={() => openLabelModal(item.label!.productName, null, item.productUrl, labelLanguage)}
+                                  onClick={() => openLabelModal(item.label?.productName || item.productName, null, item.productUrl, labelLanguage)}
                                   className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1 cursor-pointer"
                                 >
                                   <Plus className="w-3 h-3" />

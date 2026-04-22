@@ -8,9 +8,27 @@ function normalizeProductName(name: string): string {
 
 export async function POST() {
   try {
-    // Get all labels
-    const labels = await prisma.productLabel.findMany();
+    // Get all Czech labels (only Czech labels should be linked to OrderItems)
+    const labels = await prisma.productLabel.findMany({
+      where: { language: "cs" },
+    });
     
+    // First, unlink any items that are linked to non-Czech labels
+    const czechLabelIds = new Set(labels.map((l) => l.id));
+    const allLinkedItems = await prisma.orderItem.findMany({
+      where: { labelId: { not: null } },
+    });
+    let unlinkedCount = 0;
+    for (const item of allLinkedItems) {
+      if (item.labelId && !czechLabelIds.has(item.labelId)) {
+        await prisma.orderItem.update({
+          where: { id: item.id },
+          data: { labelId: null },
+        });
+        unlinkedCount++;
+      }
+    }
+
     // Get all unlinked order items
     const unlinkedItems = await prisma.orderItem.findMany({
       where: { labelId: null },
@@ -46,6 +64,7 @@ export async function POST() {
     return NextResponse.json({ 
       success: true, 
       labelsProcessed: labels.length,
+      itemsUnlinked: unlinkedCount,
       itemsLinked: linkedCount 
     });
   } catch (error) {

@@ -44,8 +44,6 @@ export async function POST(request: NextRequest) {
         nutricniHodnoty: data.nutricniHodnoty,
         skladovani: data.skladovani || null,
         vyrobce: data.vyrobce,
-        verified: data.verified ?? undefined,
-        hasFactoryLabel: data.hasFactoryLabel ?? undefined,
       },
       create: {
         productName: data.productName,

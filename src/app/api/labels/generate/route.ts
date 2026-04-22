@@ -36,6 +36,11 @@ export async function POST(request: NextRequest) {
       labelMap.set(label.productName, label);
     }
 
+    // Helper to normalize product name (removes "Pomozte neplýtvat" suffix)
+    function normalizeProductName(name: string): string {
+      return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "").trim();
+    }
+
     // Build label requests
     const labelRequests: LabelRequest[] = [];
 
@@ -53,8 +58,15 @@ export async function POST(request: NextRequest) {
           // For Czech, use the linked label directly
           label = item.label;
         } else if (item.label) {
-          // For other languages, find label with same productName
-          label = labelMap.get(item.label.productName);
+          // For other languages, find label with same productName as Czech label
+          label = labelMap.get(item.label.productName)
+            || labelMap.get(normalizeProductName(item.label.productName));
+        }
+        
+        // Also try direct lookup by item's productName (for cases without Czech label)
+        if (!label && language !== "cs") {
+          label = labelMap.get(item.productName)
+            || labelMap.get(normalizeProductName(item.productName));
         }
 
         // Skip items without labels

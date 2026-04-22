@@ -13,8 +13,10 @@ export async function POST() {
       include: { label: true },
     });
     
-    // Get all labels
-    const labels = await prisma.productLabel.findMany();
+    // Get only Czech labels (only Czech labels should be linked to OrderItems)
+    const labels = await prisma.productLabel.findMany({
+      where: { language: "cs" },
+    });
     
     // Create a map of normalized label names to label
     const labelMap = new Map<string, typeof labels[0]>();
