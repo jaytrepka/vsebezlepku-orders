@@ -48,6 +48,8 @@ export default function StockPage() {
   const [editCount, setEditCount] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name" | "count">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [filterRedExp, setFilterRedExp] = useState(false);
+  const [filterYellowExp, setFilterYellowExp] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -178,8 +180,17 @@ export default function StockPage() {
     return dir * (new Date(aDate).getTime() - new Date(bDate).getTime());
   });
 
-  const totalProducts = products.length;
-  const totalPieces = products.reduce((sum, p) => sum + p.totalCount, 0);
+  const filteredProducts = (filterRedExp || filterYellowExp)
+    ? sortedProducts.filter((p) =>
+        p.expirations.some((e) => {
+          const color = getExpirationColor(e.expirationDate);
+          return (filterRedExp && color === "red") || (filterYellowExp && color === "yellow");
+        })
+      )
+    : sortedProducts;
+
+  const totalProducts = filteredProducts.length;
+  const totalPieces = filteredProducts.reduce((sum, p) => sum + p.totalCount, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -213,6 +224,32 @@ export default function StockPage() {
         </div>
       )}
 
+      {/* Filters */}
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <div className="bg-white rounded-lg shadow p-3 flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filterRedExp}
+              onChange={(e) => setFilterRedExp(e.target.checked)}
+              className="w-4 h-4 rounded cursor-pointer accent-red-500"
+            />
+            <span className="inline-block w-3 h-3 rounded-full bg-red-400" />
+            Do 1 měsíce
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filterYellowExp}
+              onChange={(e) => setFilterYellowExp(e.target.checked)}
+              className="w-4 h-4 rounded cursor-pointer accent-yellow-500"
+            />
+            <span className="inline-block w-3 h-3 rounded-full bg-yellow-400" />
+            1–2 měsíce
+          </label>
+        </div>
+      </div>
+
       {/* Products list */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -241,7 +278,7 @@ export default function StockPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {sortedProducts.map((product) => {
+              {filteredProducts.map((product) => {
                 const assignedCount = product.expirations.reduce((sum, e) => sum + e.count, 0);
                 const unassigned = product.totalCount - assignedCount;
 
