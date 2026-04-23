@@ -95,7 +95,6 @@
         <button id="labelapp-add" class="labelapp-btn">Add into LabelApp</button>
         <button id="labelapp-stop" class="labelapp-btn danger" style="display:none;">Stop</button>
         <button id="labelapp-update-btn" class="labelapp-btn secondary">Update order in LabelApp</button>
-        <button id="labelapp-fix-codes" class="labelapp-btn secondary">🔧 Fix all product codes</button>
         <div id="labelapp-update-container" class="labelapp-input-container">
             <input type="text" id="labelapp-order-id" class="labelapp-input" placeholder="Order ID (e.g., O202500300)">
             <button id="labelapp-update-confirm" class="labelapp-btn secondary">Update</button>
@@ -108,7 +107,6 @@
     const addBtn = document.getElementById('labelapp-add');
     const stopBtn = document.getElementById('labelapp-stop');
     const updateBtn = document.getElementById('labelapp-update-btn');
-    const fixCodesBtn = document.getElementById('labelapp-fix-codes');
     const updateContainer = document.getElementById('labelapp-update-container');
     const orderIdInput = document.getElementById('labelapp-order-id');
     const updateConfirmBtn = document.getElementById('labelapp-update-confirm');
@@ -531,106 +529,6 @@
             updateConfirmBtn.click();
         }
     });
-
-    // Fix all product codes button handler (temporary - with auto-pagination)
-    fixCodesBtn.addEventListener('click', async () => {
-        if (isRunning) return;
-
-        // Check if we're continuing from a previous page
-        const continuing = sessionStorage.getItem('labelapp-fix-codes-running');
-        if (!continuing) {
-            if (!confirm('This will go through ALL pages and update product codes for existing orders. Continue?')) return;
-        }
-
-        isRunning = true;
-        shouldStop = false;
-        fixCodesBtn.disabled = true;
-        stopBtn.style.display = 'block';
-
-        try {
-            // Get existing order numbers
-            setStatus('Fetching existing orders from LabelApp...');
-            const existingOrderNumbers = await getExistingOrderNumbers();
-            setStatus(`Found ${existingOrderNumbers.length} existing orders`);
-
-            // Get order infos from this page
-            const orderInfos = getOrderIdsFromPage();
-            const existingOnPage = orderInfos.filter(o => existingOrderNumbers.includes(o.orderNumber));
-
-            if (existingOnPage.length === 0) {
-                setStatus('No existing orders on this page.');
-            } else {
-                setStatus(`Processing ${existingOnPage.length} orders on this page...`);
-
-                const batchSize = 10;
-                for (let i = 0; i < existingOnPage.length; i += batchSize) {
-                    if (shouldStop) { setStatus('Stopped by user'); break; }
-
-                    const batch = existingOnPage.slice(i, i + batchSize);
-                    const ordersData = [];
-
-                    for (const info of batch) {
-                        setStatus(`Fetching ${i + ordersData.length + 1}/${existingOnPage.length}: ${info.orderNumber}...`);
-                        const order = await fetchOrderDetails(info.id);
-                        if (order && order.items.length > 0) {
-                            ordersData.push({
-                                orderNumber: info.orderNumber,
-                                items: order.items.map(item => ({
-                                    productName: item.productName,
-                                    productCode: item.productCode || null,
-                                })),
-                            });
-                        }
-                        await new Promise(r => setTimeout(r, 200));
-                    }
-
-                    if (ordersData.length > 0 && !shouldStop) {
-                        const result = await new Promise((resolve, reject) => {
-                            GM_xmlhttpRequest({
-                                method: 'POST',
-                                url: `${LABEL_APP_URL}/api/orders/fix-codes`,
-                                headers: { 'Content-Type': 'application/json' },
-                                data: JSON.stringify({ orders: ordersData }),
-                                onload: (r) => { try { resolve(JSON.parse(r.responseText)); } catch(e) { reject(e); } },
-                                onerror: reject,
-                            });
-                        });
-                        setStatus(`Page progress: ${Math.min(i + batchSize, existingOnPage.length)}/${existingOnPage.length} — updated ${result.updated} codes`);
-                    }
-                }
-            }
-
-            // Auto-navigate to next page
-            if (!shouldStop) {
-                const nextPageBtn = document.querySelector('a[data-testid="buttonNextPage"]');
-                if (nextPageBtn) {
-                    setStatus('Moving to next page...');
-                    sessionStorage.setItem('labelapp-fix-codes-running', 'true');
-                    nextPageBtn.click();
-                    return; // page will reload
-                } else {
-                    sessionStorage.removeItem('labelapp-fix-codes-running');
-                    setStatus('✅ All pages processed! Product codes updated.');
-                }
-            } else {
-                sessionStorage.removeItem('labelapp-fix-codes-running');
-            }
-
-        } catch (error) {
-            console.error('Fix codes error:', error);
-            setStatus(`Error: ${error.message || 'Unknown error'}`, true);
-            sessionStorage.removeItem('labelapp-fix-codes-running');
-        }
-
-        fixCodesBtn.disabled = false;
-        stopBtn.style.display = 'none';
-        isRunning = false;
-    });
-
-    // Auto-continue fix codes if coming from previous page
-    if (sessionStorage.getItem('labelapp-fix-codes-running')) {
-        setTimeout(() => fixCodesBtn.click(), 1000);
-    }
 
     setStatus('LabelApp Integration ready');
 })();
