@@ -3,7 +3,52 @@ import { prisma } from "@/lib/prisma";
 
 // Helper function to normalize product name (remove " - Pomozte neplýtvat" suffix)
 function normalizeProductName(name: string): string {
-  return name.replace(/ - Pomozte neplýtvat$/, "").trim();
+  return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").trim();
+}
+
+// Decrement stock counts for order items (FIFO from soonest-expiring batches)
+async function decrementStockForOrder(items: { productName: string; quantity: number }[]) {
+  for (const item of items) {
+    const normalized = normalizeProductName(item.productName);
+    const quantity = item.quantity || 1;
+
+    // Find matching stock product
+    const stockProduct = await prisma.stockProduct.findFirst({
+      where: {
+        OR: [
+          { productName: item.productName },
+          { productName: normalized },
+        ],
+      },
+      include: { expirations: { orderBy: { expirationDate: "asc" } } },
+    });
+
+    if (!stockProduct || stockProduct.totalCount <= 0) continue;
+
+    const newTotal = Math.max(0, stockProduct.totalCount - quantity);
+    const diff = stockProduct.totalCount - newTotal;
+
+    // FIFO: subtract from soonest-expiring batches
+    let remaining = diff;
+    for (const exp of stockProduct.expirations) {
+      if (remaining <= 0) break;
+      if (exp.count <= remaining) {
+        remaining -= exp.count;
+        await prisma.expirationDate.delete({ where: { id: exp.id } });
+      } else {
+        await prisma.expirationDate.update({
+          where: { id: exp.id },
+          data: { count: exp.count - remaining },
+        });
+        remaining = 0;
+      }
+    }
+
+    await prisma.stockProduct.update({
+      where: { id: stockProduct.id },
+      data: { totalCount: newTotal },
+    });
+  }
 }
 
 // GET - Return list of existing order numbers
@@ -142,6 +187,12 @@ export async function POST(request: NextRequest) {
           }
 
           results.created++;
+
+          // Decrement stock for newly created orders
+          await decrementStockForOrder(items.map((i: { productName: string; quantity?: number }) => ({
+            productName: i.productName,
+            quantity: i.quantity || 1,
+          })));
         }
       } catch (orderError) {
         console.error("Error processing order:", orderError);
