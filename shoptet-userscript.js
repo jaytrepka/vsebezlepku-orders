@@ -95,7 +95,6 @@
         <button id="labelapp-add" class="labelapp-btn">Add into LabelApp</button>
         <button id="labelapp-stop" class="labelapp-btn danger" style="display:none;">Stop</button>
         <button id="labelapp-update-btn" class="labelapp-btn secondary">Update order in LabelApp</button>
-        <button id="labelapp-fix-dates" class="labelapp-btn secondary">🔧 Fix all dates</button>
         <div id="labelapp-update-container" class="labelapp-input-container">
             <input type="text" id="labelapp-order-id" class="labelapp-input" placeholder="Order ID (e.g., O202500300)">
             <button id="labelapp-update-confirm" class="labelapp-btn secondary">Update</button>
@@ -526,84 +525,6 @@
             updateConfirmBtn.click();
         }
     });
-
-    // Fix all dates button handler (temporary) - with auto-pagination
-    const FIX_DATES_KEY = 'labelapp-fix-dates-active';
-    const FIX_DATES_TOTAL_KEY = 'labelapp-fix-dates-total';
-    const FIX_DATES_PAGE_KEY = 'labelapp-fix-dates-page';
-
-    async function fixDatesOnCurrentPage() {
-        const fixBtn = document.getElementById('labelapp-fix-dates');
-        fixBtn.disabled = true;
-
-        const currentPage = document.querySelector('strong[data-testid="buttonCurrentPage"]');
-        const pageNum = currentPage ? currentPage.textContent.trim() : '?';
-
-        setStatus(`Stránka ${pageNum}: sbírám data objednávek...`);
-
-        try {
-            const orderInfos = getOrderIdsFromPage();
-            const ordersWithDates = orderInfos
-                .filter(o => o.orderDate)
-                .map(o => ({ orderNumber: o.orderNumber, orderDate: o.orderDate }));
-
-            let updated = parseInt(sessionStorage.getItem(FIX_DATES_TOTAL_KEY) || '0', 10);
-
-            if (ordersWithDates.length > 0) {
-                setStatus(`Stránka ${pageNum}: odesílám ${ordersWithDates.length} oprav...`);
-
-                const result = await new Promise((resolve, reject) => {
-                    GM_xmlhttpRequest({
-                        method: 'POST',
-                        url: `${LABEL_APP_URL}/api/orders/fix-dates`,
-                        headers: { 'Content-Type': 'application/json' },
-                        data: JSON.stringify({ orders: ordersWithDates }),
-                        onload: function(response) {
-                            try { resolve(JSON.parse(response.responseText)); }
-                            catch (e) { reject(e); }
-                        },
-                        onerror: reject
-                    });
-                });
-
-                updated += (result.updated || 0);
-                sessionStorage.setItem(FIX_DATES_TOTAL_KEY, String(updated));
-            }
-
-            // Check for next page
-            const nextLink = document.querySelector('a[data-testid="buttonNextPage"]');
-            if (nextLink) {
-                setStatus(`Stránka ${pageNum} hotovo (${updated} celkem). Přecházím...`);
-                setTimeout(() => nextLink.click(), 500);
-            } else {
-                // Last page - done
-                sessionStorage.removeItem(FIX_DATES_KEY);
-                sessionStorage.removeItem(FIX_DATES_TOTAL_KEY);
-                sessionStorage.removeItem(FIX_DATES_PAGE_KEY);
-                setStatus(`✅ Hotovo! Opraveno ${updated} objednávek`);
-                fixBtn.disabled = false;
-            }
-        } catch (error) {
-            console.error('Fix dates error:', error);
-            setStatus(`Error: ${error.message || 'Unknown error'}`, true);
-            sessionStorage.removeItem(FIX_DATES_KEY);
-            sessionStorage.removeItem(FIX_DATES_TOTAL_KEY);
-            sessionStorage.removeItem(FIX_DATES_PAGE_KEY);
-            fixBtn.disabled = false;
-        }
-    }
-
-    document.getElementById('labelapp-fix-dates').addEventListener('click', () => {
-        sessionStorage.setItem(FIX_DATES_KEY, 'true');
-        sessionStorage.setItem(FIX_DATES_TOTAL_KEY, '0');
-        sessionStorage.setItem(FIX_DATES_PAGE_KEY, '1');
-        fixDatesOnCurrentPage();
-    });
-
-    // Auto-continue if mid-fix on page load
-    if (sessionStorage.getItem(FIX_DATES_KEY) === 'true') {
-        setTimeout(() => fixDatesOnCurrentPage(), 1500);
-    }
 
     setStatus('LabelApp Integration ready');
 })();
