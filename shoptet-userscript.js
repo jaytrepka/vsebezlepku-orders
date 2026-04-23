@@ -203,11 +203,15 @@
                 // Get product URL
                 const productUrl = productLink.href || null;
 
+                // Get product code from the code cell
+                const productCode = productLink.textContent.trim() || null;
+
                 order.items.push({
                     productName,
                     quantity,
                     unitPrice,
-                    productUrl
+                    productUrl,
+                    productCode
                 });
             });
 

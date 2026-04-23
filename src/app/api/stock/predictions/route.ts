@@ -36,13 +36,15 @@ export async function GET() {
     const orderItems = await prisma.orderItem.findMany({
       select: {
         productName: true,
+        productCode: true,
         quantity: true,
         order: { select: { emailDate: true } },
       },
     });
 
-    // Build sales history per normalized product name
+    // Build sales history per normalized product name AND per product code
     const salesByProduct = new Map<string, SalesRecord[]>();
+    const salesByCode = new Map<string, SalesRecord[]>();
     for (const item of orderItems) {
       const normalized = normalizeProductName(item.productName);
       if (!salesByProduct.has(normalized)) {
@@ -52,6 +54,16 @@ export async function GET() {
         date: item.order.emailDate,
         quantity: item.quantity,
       });
+
+      if (item.productCode) {
+        if (!salesByCode.has(item.productCode)) {
+          salesByCode.set(item.productCode, []);
+        }
+        salesByCode.get(item.productCode)!.push({
+          date: item.order.emailDate,
+          quantity: item.quantity,
+        });
+      }
     }
 
     const today = new Date();
@@ -59,7 +71,10 @@ export async function GET() {
 
     for (const product of stockProducts) {
       const normalized = normalizeProductName(product.productName);
-      const sales = salesByProduct.get(normalized) || salesByProduct.get(product.productName) || [];
+      const sales = salesByProduct.get(normalized)
+        || salesByProduct.get(product.productName)
+        || (product.code ? salesByCode.get(product.code) : null)
+        || [];
 
       if (sales.length === 0 || product.totalCount <= 0) {
         predictions[product.productName] = {

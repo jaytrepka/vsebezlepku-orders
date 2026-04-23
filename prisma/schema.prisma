@@ -24,6 +24,7 @@ model OrderItem {
   quantity    Int
   unitPrice   String?
   productUrl  String?
+  productCode String?
   labelId     String?
   order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   label       ProductLabel? @relation(fields: [labelId], references: [id])

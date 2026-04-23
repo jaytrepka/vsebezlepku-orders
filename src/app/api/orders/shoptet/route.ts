@@ -7,19 +7,22 @@ function normalizeProductName(name: string): string {
 }
 
 // Decrement stock counts for order items (FIFO from soonest-expiring batches)
-async function decrementStockForOrder(items: { productName: string; quantity: number }[]) {
+async function decrementStockForOrder(items: { productName: string; quantity: number; productCode?: string | null }[]) {
   for (const item of items) {
     const normalized = normalizeProductName(item.productName);
     const quantity = item.quantity || 1;
 
-    // Find matching stock product
+    // Find matching stock product by name or code
+    const orConditions: { productName?: string; code?: string }[] = [
+      { productName: item.productName },
+      { productName: normalized },
+    ];
+    if (item.productCode) {
+      orConditions.push({ code: item.productCode });
+    }
+
     const stockProduct = await prisma.stockProduct.findFirst({
-      where: {
-        OR: [
-          { productName: item.productName },
-          { productName: normalized },
-        ],
-      },
+      where: { OR: orConditions },
       include: { expirations: { orderBy: { expirationDate: "asc" } } },
     });
 
@@ -135,6 +138,7 @@ export async function POST(request: NextRequest) {
                 quantity: item.quantity || 1,
                 unitPrice: item.unitPrice || null,
                 productUrl: item.productUrl || null,
+                productCode: item.productCode || null,
                 labelId: label?.id || null,
               },
             });
@@ -181,6 +185,7 @@ export async function POST(request: NextRequest) {
                 quantity: item.quantity || 1,
                 unitPrice: item.unitPrice || null,
                 productUrl: item.productUrl || null,
+                productCode: item.productCode || null,
                 labelId: label?.id || null,
               },
             });
@@ -189,9 +194,10 @@ export async function POST(request: NextRequest) {
           results.created++;
 
           // Decrement stock for newly created orders
-          await decrementStockForOrder(items.map((i: { productName: string; quantity?: number }) => ({
+          await decrementStockForOrder(items.map((i: { productName: string; quantity?: number; productCode?: string }) => ({
             productName: i.productName,
             quantity: i.quantity || 1,
+            productCode: i.productCode || null,
           })));
         }
       } catch (orderError) {
