@@ -15,6 +15,7 @@ interface Prediction {
   totalSold: number;
   orderCount: number;
   atRisk: boolean; // trending date (or overall if no trending) > earliest expiration
+  atRiskOverall: boolean; // overall date > earliest expiration
   unsoldCountTrending: number | null;
   unsoldCountOverall: number | null;
 }
@@ -70,6 +71,7 @@ export async function GET() {
           totalSold: 0,
           orderCount: 0,
           atRisk: false,
+          atRiskOverall: false,
           unsoldCountTrending: null,
           unsoldCountOverall: null,
         };
@@ -121,6 +123,9 @@ export async function GET() {
       const atRisk = earliestExpiration
         ? relevantDate.getTime() > new Date(earliestExpiration).getTime()
         : false;
+      const atRiskOverall = earliestExpiration
+        ? overallDate.getTime() > new Date(earliestExpiration).getTime()
+        : false;
 
       // Compute unsold counts at earliest expiration for both velocities
       let unsoldCountTrending: number | null = null;
@@ -144,6 +149,7 @@ export async function GET() {
         totalSold,
         orderCount: sortedDates.length,
         atRisk,
+        atRiskOverall,
         unsoldCountTrending,
         unsoldCountOverall,
       };

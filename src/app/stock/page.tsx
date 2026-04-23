@@ -25,6 +25,7 @@ interface Prediction {
   totalSold: number;
   orderCount: number;
   atRisk: boolean;
+  atRiskOverall: boolean;
   unsoldCountTrending: number | null;
   unsoldCountOverall: number | null;
 }
@@ -63,6 +64,7 @@ export default function StockPage() {
   const [filterRedExp, setFilterRedExp] = useState(false);
   const [filterYellowExp, setFilterYellowExp] = useState(false);
   const [filterAtRisk, setFilterAtRisk] = useState(false);
+  const [filterAtRiskOverall, setFilterAtRiskOverall] = useState(false);
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
 
   useEffect(() => {
@@ -225,16 +227,17 @@ export default function StockPage() {
     return dir * (new Date(aDate).getTime() - new Date(bDate).getTime());
   });
 
-  const filteredProducts = (filterRedExp || filterYellowExp || filterAtRisk)
+  const anyFilter = filterRedExp || filterYellowExp || filterAtRisk || filterAtRiskOverall;
+  const filteredProducts = anyFilter
     ? sortedProducts.filter((p) => {
         const expMatch = p.expirations.some((e) => {
           const color = getExpirationColor(e.expirationDate);
           return (filterRedExp && color === "red") || (filterYellowExp && color === "yellow");
         });
-        const riskMatch = filterAtRisk && predictions[p.productName]?.atRisk;
-        if (filterAtRisk && (filterRedExp || filterYellowExp)) return expMatch || riskMatch;
-        if (filterAtRisk) return riskMatch;
-        return expMatch;
+        const pred = predictions[p.productName];
+        const riskMatch = filterAtRisk && pred?.atRisk;
+        const riskOverallMatch = filterAtRiskOverall && pred?.atRiskOverall;
+        return expMatch || riskMatch || riskOverallMatch;
       })
     : sortedProducts;
 
@@ -318,7 +321,17 @@ export default function StockPage() {
               className="w-4 h-4 rounded cursor-pointer accent-red-700"
             />
             <AlertTriangle className="w-4 h-4 text-red-500" />
-            Nestihne se vyprodat
+            Nestihne se vyprodat (📈 trend)
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filterAtRiskOverall}
+              onChange={(e) => setFilterAtRiskOverall(e.target.checked)}
+              className="w-4 h-4 rounded cursor-pointer accent-orange-500"
+            />
+            <AlertTriangle className="w-4 h-4 text-orange-400" />
+            Nestihne se vyprodat (📊 celkově)
           </label>
         </div>
       </div>
