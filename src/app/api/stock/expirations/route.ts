@@ -12,11 +12,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "stockProductId, expirationDate, and count required" }, { status: 400 });
     }
 
+    // Validate count doesn't exceed available (totalCount - already assigned)
+    const product = await prisma.stockProduct.findUnique({
+      where: { id: stockProductId },
+      include: { expirations: true },
+    });
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    const assignedCount = product.expirations.reduce((sum, e) => sum + e.count, 0);
+    const available = product.totalCount - assignedCount;
+    const clampedCount = Math.min(count, Math.max(available, 0));
+
+    if (clampedCount <= 0) {
+      return NextResponse.json({ error: "No unassigned stock available" }, { status: 400 });
+    }
+
     const expiration = await prisma.expirationDate.create({
       data: {
         stockProductId,
         expirationDate: new Date(expirationDate),
-        count,
+        count: clampedCount,
       },
     });
 
@@ -39,9 +55,25 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updateData: { count?: number; expirationDate?: Date; neplytvatConfirmed?: boolean } = {};
-    if (count !== undefined) updateData.count = count;
     if (expirationDate !== undefined) updateData.expirationDate = new Date(expirationDate);
     if (neplytvatConfirmed !== undefined) updateData.neplytvatConfirmed = neplytvatConfirmed;
+
+    // Validate count doesn't exceed totalCount
+    if (count !== undefined) {
+      const existing = await prisma.expirationDate.findUnique({
+        where: { id },
+        include: { stockProduct: { include: { expirations: true } } },
+      });
+      if (existing) {
+        const otherAssigned = existing.stockProduct.expirations
+          .filter((e) => e.id !== id)
+          .reduce((sum, e) => sum + e.count, 0);
+        const maxAllowed = existing.stockProduct.totalCount - otherAssigned;
+        updateData.count = Math.min(count, Math.max(maxAllowed, 0));
+      } else {
+        updateData.count = count;
+      }
+    }
 
     const expiration = await prisma.expirationDate.update({
       where: { id },

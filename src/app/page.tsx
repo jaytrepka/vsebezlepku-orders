@@ -34,6 +34,11 @@ interface Order {
 
 export default function Home() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [filterMonth, setFilterMonth] = useState<string>("");
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,6 +101,10 @@ export default function Home() {
 
   useEffect(() => {
     fetchOrders();
+  }, [currentPage, perPage, filterMonth]);
+
+  useEffect(() => {
+    fetchAvailableMonths();
   }, []);
 
   // Fetch labels for selected language (non-Czech)
@@ -139,10 +148,21 @@ export default function Home() {
   }
 
   async function fetchOrders() {
-    const res = await fetch("/api/orders");
+    const params = new URLSearchParams({ page: String(currentPage), perPage: String(perPage) });
+    if (filterMonth) params.set("month", filterMonth);
+    const res = await fetch(`/api/orders?${params}`);
+    const data = await res.json();
+    if (data.orders && Array.isArray(data.orders)) {
+      setOrders(data.orders);
+      setTotalOrders(data.total);
+    }
+  }
+
+  async function fetchAvailableMonths() {
+    const res = await fetch("/api/orders/months");
     const data = await res.json();
     if (Array.isArray(data)) {
-      setOrders(data);
+      setAvailableMonths(data);
     }
   }
 
@@ -157,6 +177,7 @@ export default function Home() {
     });
     setSelectedOrders([]);
     fetchOrders();
+    fetchAvailableMonths();
   }
 
   async function generateLabels() {
@@ -398,6 +419,35 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Měsíc:</label>
+            <select
+              value={filterMonth}
+              onChange={(e) => { setFilterMonth(e.target.value); setCurrentPage(1); setSelectedOrders([]); }}
+              className="border rounded px-2 py-1"
+            >
+              <option value="">Všechny</option>
+              {availableMonths.map((m) => {
+                const [y, mon] = m.split("-");
+                const monthNames = ["", "Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+                return <option key={m} value={m}>{monthNames[parseInt(mon)]} {y}</option>;
+              })}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Na stránku:</label>
+            <select
+              value={perPage}
+              onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
+              className="border rounded px-2 py-1"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Jazyk štítků:</label>
             <select
               value={labelLanguage}
@@ -625,6 +675,56 @@ export default function Home() {
               )}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          {totalOrders > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+              <div className="text-sm text-gray-600">
+                Zobrazeno {Math.min((currentPage - 1) * perPage + 1, totalOrders)}–{Math.min(currentPage * perPage, totalOrders)} z {totalOrders} objednávek
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Předchozí
+                </button>
+                {Array.from({ length: Math.ceil(totalOrders / perPage) }, (_, i) => i + 1)
+                  .filter((p) => {
+                    const total = Math.ceil(totalOrders / perPage);
+                    return p === 1 || p === total || Math.abs(p - currentPage) <= 2;
+                  })
+                  .reduce<(number | string)[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    typeof p === "string" ? (
+                      <span key={`dots-${i}`} className="px-1 text-gray-400">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`px-3 py-1 text-sm border rounded ${
+                          p === currentPage ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalOrders / perPage), p + 1))}
+                  disabled={currentPage >= Math.ceil(totalOrders / perPage)}
+                  className="px-3 py-1 text-sm border rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Další →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

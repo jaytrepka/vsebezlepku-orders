@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shoptet Sklad → VšeBezLepku Expirace
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Synchronizuje stavy skladu do VšeBezLepku aplikace pro sledování trvanlivosti
+// @version      2.0
+// @description  Synchronizuje stavy skladu do VšeBezLepku aplikace pro sledování trvanlivosti (všechny stránky)
 // @author       VšeBezLepku
 // @match        *://*.myshoptet.com/admin/sklad/*
 // @match        *://*.shoptet.cz/admin/sklad/*
@@ -18,33 +18,29 @@
     // For local testing, uncomment this:
     // const APP_URL = 'http://localhost:3000';
 
-    let debounceTimer = null; // kept for potential future use
+    const SYNC_KEY = 'vbl-sync-active';
+    const SYNC_COUNT_KEY = 'vbl-sync-count';
+    const SYNC_PAGE_KEY = 'vbl-sync-page';
 
-    console.log("VšeBezLepku Expirace: Script v1.0 spuštěn.");
+    console.log("VšeBezLepku Expirace: Script v2.0 spuštěn.");
 
-    function processRows(force = false) {
-        let selector = 'tr[data-lasteditedid]:not(.tm-exp-processed)';
-        if (force) selector = 'tr[data-lasteditedid]';
+    function getCurrentPage() {
+        const current = document.querySelector('strong[data-testid="buttonCurrentPage"]');
+        return current ? parseInt(current.textContent.trim(), 10) : 1;
+    }
 
-        const rows = document.querySelectorAll(selector);
+    function getNextPageLink() {
+        return document.querySelector('a[data-testid="buttonNextPage"]');
+    }
 
-        if (rows.length === 0) {
-            if (force) updateButtonStatus("Žádné produkty", false);
-            return;
-        }
-
-        updateButtonStatus("Hledám produkty (>0 ks)...", true);
-
+    function collectRows() {
+        const rows = document.querySelectorAll('tr[data-lasteditedid]');
         const batchData = [];
         const rowsMap = new Map();
-        let skippedCount = 0;
 
         rows.forEach((row) => {
-            row.classList.add('tm-exp-processed');
-
             const codeCell = row.querySelector('td:nth-child(3) span');
             const stockInput = row.querySelector('input[name^="stock"]');
-
             const nameContainer = row.querySelector('.name-inner');
             const nameStrong = row.querySelector('.name-inner strong');
             const targetEl = nameStrong || nameContainer;
@@ -62,35 +58,64 @@
                         productName = nameContainer.innerText.trim().split('\n')[0];
                     }
 
-                    batchData.push({
-                        code: code,
-                        stock: stock,
-                        name: productName
-                    });
-
+                    batchData.push({ code, stock, name: productName });
                     rowsMap.set(code, row);
-
-                    if (force) {
-                        const oldInfo = row.querySelector('.tm-vbl-info');
-                        if (oldInfo) oldInfo.remove();
-                    }
-                } else {
-                    skippedCount++;
                 }
             }
         });
 
+        return { batchData, rowsMap };
+    }
+
+    function processCurrentPage(isAutoChain = false) {
+        const page = getCurrentPage();
+        const { batchData, rowsMap } = collectRows();
+
         if (batchData.length === 0) {
-            updateButtonStatus("Hotovo (0ks vynecháno)", false);
-            setTimeout(() => updateButtonStatus("🔄 Sync trvanlivosti", false), 2000);
+            if (!isAutoChain) {
+                updateButtonStatus("Žádné produkty na stránce", false);
+                setTimeout(() => updateButtonStatus("🔄 Sync trvanlivosti (všechny stránky)", false), 2000);
+            } else {
+                goToNextPageOrFinish(0);
+            }
             return;
         }
 
-        updateButtonStatus(`Odesílám ${batchData.length} produktů...`, true);
-        sendBatchToApp(batchData, rowsMap);
+        const prevCount = parseInt(sessionStorage.getItem(SYNC_COUNT_KEY) || '0', 10);
+        updateButtonStatus(`Stránka ${page}: odesílám ${batchData.length} produktů...`, true);
+
+        sendBatchToApp(batchData, rowsMap, () => {
+            const newTotal = prevCount + batchData.length;
+            sessionStorage.setItem(SYNC_COUNT_KEY, String(newTotal));
+            goToNextPageOrFinish(newTotal);
+        }, () => {
+            // On error, stop the chain
+            sessionStorage.removeItem(SYNC_KEY);
+            sessionStorage.removeItem(SYNC_COUNT_KEY);
+            sessionStorage.removeItem(SYNC_PAGE_KEY);
+        });
     }
 
-    function sendBatchToApp(batchData, rowsMap) {
+    function goToNextPageOrFinish(totalSynced) {
+        const nextLink = getNextPageLink();
+        if (nextLink) {
+            const page = getCurrentPage();
+            sessionStorage.setItem(SYNC_PAGE_KEY, String(page + 1));
+            updateButtonStatus(`Stránka ${page} hotovo (${totalSynced} celkem). Přecházím...`, true);
+            setTimeout(() => {
+                nextLink.click();
+            }, 500);
+        } else {
+            // Last page — done!
+            sessionStorage.removeItem(SYNC_KEY);
+            sessionStorage.removeItem(SYNC_PAGE_KEY);
+            sessionStorage.removeItem(SYNC_COUNT_KEY);
+            updateButtonStatus(`✅ Hotovo! Synchronizováno ${totalSynced} produktů`, false);
+            setTimeout(() => updateButtonStatus("🔄 Sync trvanlivosti (všechny stránky)", false), 4000);
+        }
+    }
+
+    function sendBatchToApp(batchData, rowsMap, onSuccess, onError) {
         GM_xmlhttpRequest({
             method: "POST",
             url: `${APP_URL}/api/stock`,
@@ -101,7 +126,6 @@
                 if (response.status === 200) {
                     try {
                         const responseMap = JSON.parse(response.responseText);
-
                         for (const [code, data] of Object.entries(responseMap)) {
                             const row = rowsMap.get(code);
                             if (row) {
@@ -110,20 +134,22 @@
                                 displayExpirationInfo(data, nameStrong || nameContainer);
                             }
                         }
-                        updateButtonStatus("✅ Hotovo", false);
-                        setTimeout(() => updateButtonStatus("🔄 Sync trvanlivosti", false), 2000);
+                        if (onSuccess) onSuccess();
                     } catch (e) {
                         console.error("VšeBezLepku: Chyba JSON:", e);
                         updateButtonStatus("❌ Chyba dat", false);
+                        if (onError) onError();
                     }
                 } else {
                     console.error("VšeBezLepku: HTTP chyba", response.status, response.responseText);
                     updateButtonStatus(`❌ Chyba ${response.status}`, false);
+                    if (onError) onError();
                 }
             },
             onerror: function(err) {
                 console.error("VšeBezLepku: Síťová chyba", err);
                 updateButtonStatus("❌ Chyba sítě", false);
+                if (onError) onError();
             }
         });
     }
@@ -167,7 +193,6 @@
 
         span.style.color = textColor;
 
-        // Show total expirations summary
         const totalExpCount = data.expirations.reduce((sum, e) => sum + e.count, 0);
         const unassigned = data.totalCount - totalExpCount;
 
@@ -192,7 +217,7 @@
 
         const btn = document.createElement('div');
         btn.id = 'tm-vbl-btn';
-        btn.innerText = '🔄 Sync trvanlivosti';
+        btn.innerText = '🔄 Sync trvanlivosti (všechny stránky)';
 
         Object.assign(btn.style, {
             position: 'fixed',
@@ -210,7 +235,12 @@
             fontSize: '14px'
         });
 
-        btn.onclick = () => { processRows(true); };
+        btn.onclick = () => {
+            sessionStorage.setItem(SYNC_KEY, 'true');
+            sessionStorage.setItem(SYNC_COUNT_KEY, '0');
+            sessionStorage.setItem(SYNC_PAGE_KEY, '1');
+            processCurrentPage(false);
+        };
         document.body.appendChild(btn);
     }
 
@@ -222,9 +252,14 @@
         }
     }
 
-    // Auto-create button when page loads, no auto-sync
+    // On page load: create button + auto-continue if mid-sync
     setTimeout(() => {
         createRefreshButton();
+
+        if (sessionStorage.getItem(SYNC_KEY) === 'true') {
+            updateButtonStatus(`Pokračuji sync (stránka ${getCurrentPage()})...`, true);
+            setTimeout(() => processCurrentPage(true), 500);
+        }
     }, 1500);
 
 })();

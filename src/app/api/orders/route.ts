@@ -1,22 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const orders = await prisma.order.findMany({
-      include: {
-        items: {
-          include: {
-            label: true,
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const perPage = Math.max(1, Math.min(100, parseInt(searchParams.get("perPage") || "10", 10)));
+    const month = searchParams.get("month"); // format: "2026-03" (YYYY-MM)
+
+    const where: { emailDate?: { gte: Date; lt: Date } } = {};
+    if (month) {
+      const [year, mon] = month.split("-").map(Number);
+      if (year && mon) {
+        const start = new Date(year, mon - 1, 1);
+        const end = new Date(year, mon, 1);
+        where.emailDate = { gte: start, lt: end };
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: {
+            include: {
+              label: true,
+            },
           },
         },
-      },
-      orderBy: {
-        orderNumber: "desc",
-      },
-    });
+        orderBy: { orderNumber: "desc" },
+        skip: (page - 1) * perPage,
+        take: perPage,
+      }),
+      prisma.order.count({ where }),
+    ]);
 
-    return NextResponse.json(orders);
+    return NextResponse.json({ orders, total, page, perPage });
   } catch (error) {
     console.error("Orders fetch error:", error);
     return NextResponse.json(
