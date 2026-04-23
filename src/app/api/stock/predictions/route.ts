@@ -15,6 +15,7 @@ interface Prediction {
   totalSold: number;
   orderCount: number;
   atRisk: boolean; // trending date (or overall if no trending) > earliest expiration
+  unsoldCount: number | null; // estimated pieces remaining at earliest expiration
 }
 
 function normalizeProductName(name: string): string {
@@ -68,6 +69,7 @@ export async function GET() {
           totalSold: 0,
           orderCount: 0,
           atRisk: false,
+          unsoldCount: null,
         };
         continue;
       }
@@ -118,6 +120,15 @@ export async function GET() {
         ? relevantDate.getTime() > new Date(earliestExpiration).getTime()
         : false;
 
+      // Compute unsold count at earliest expiration
+      let unsoldCount: number | null = null;
+      if (atRisk && earliestExpiration) {
+        const daysUntilExpiration = Math.max(0, (new Date(earliestExpiration).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const velocity = trendingVelocity || overallVelocity;
+        const soldByExpiration = Math.floor(velocity * daysUntilExpiration);
+        unsoldCount = Math.max(0, product.totalCount - soldByExpiration);
+      }
+
       predictions[product.productName] = {
         productName: product.productName,
         overallDate: overallDate.toISOString(),
@@ -127,6 +138,7 @@ export async function GET() {
         totalSold,
         orderCount: sortedDates.length,
         atRisk,
+        unsoldCount,
       };
     }
 

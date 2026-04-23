@@ -25,6 +25,7 @@ interface Prediction {
   totalSold: number;
   orderCount: number;
   atRisk: boolean;
+  unsoldCount: number | null;
 }
 
 function getExpirationColor(dateStr: string): "red" | "yellow" | "green" {
@@ -479,7 +480,12 @@ export default function StockPage() {
                                   📈 {formatDate(pred.trendingDate)}
                                 </span>
                                 {pred.atRisk && (
-                                  <span title="Nestihne se vyprodat před expirací!"><AlertTriangle className="w-4 h-4 text-red-500" /></span>
+                                  <span className="flex items-center gap-1" title="Nestihne se vyprodat před expirací!">
+                                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                                    {pred.unsoldCount != null && (
+                                      <span className="text-xs font-bold text-red-600">{pred.unsoldCount} ks</span>
+                                    )}
+                                  </span>
                                 )}
                               </div>
                             )}
@@ -489,7 +495,12 @@ export default function StockPage() {
                                   📊 {formatDate(pred.overallDate)}
                                 </span>
                                 {!pred.trendingDate && pred.atRisk && (
-                                  <span title="Nestihne se vyprodat před expirací!"><AlertTriangle className="w-4 h-4 text-red-500" /></span>
+                                  <span className="flex items-center gap-1" title="Nestihne se vyprodat před expirací!">
+                                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                                    {pred.unsoldCount != null && (
+                                      <span className="text-xs font-bold text-red-600">{pred.unsoldCount} ks</span>
+                                    )}
+                                  </span>
                                 )}
                               </div>
                             )}
