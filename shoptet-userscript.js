@@ -277,7 +277,22 @@
                         const text = el.textContent.trim();
                         if (text.match(/^O\d{9,}$/)) {
                             if (!orderNumbers.includes(text)) {
-                                orderIds.push({ id, orderNumber: text });
+                                // Extract order date from the grey span next to order number
+                                let orderDate = null;
+                                const cell = el.closest('td');
+                                if (cell) {
+                                    const dateSpan = cell.querySelector('span.grey.nowrap, span.grey');
+                                    if (dateSpan) {
+                                        const dateText = dateSpan.textContent.trim();
+                                        // Parse "4.4.2025 11:39" → ISO date
+                                        const dateMatch = dateText.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})/);
+                                        if (dateMatch) {
+                                            const [, day, month, year, hour, minute] = dateMatch;
+                                            orderDate = new Date(year, month - 1, day, hour, minute).toISOString();
+                                        }
+                                    }
+                                }
+                                orderIds.push({ id, orderNumber: text, orderDate });
                                 orderNumbers.push(text);
                             }
                         }
@@ -316,7 +331,8 @@
 
             const order = await fetchOrderDetails(info.id);
             if (order && order.items.length > 0) {
-                order.orderNumber = info.orderNumber; // Use the order number we found
+                order.orderNumber = info.orderNumber;
+                if (info.orderDate) order.orderDate = info.orderDate;
                 orders.push(order);
                 console.log('Fetched order:', info.orderNumber, 'with', order.items.length, 'items');
             } else {
@@ -479,6 +495,7 @@
             }
 
             order.orderNumber = orderNumber;
+            if (info.orderDate) order.orderDate = info.orderDate;
             setStatus(`Found order with ${order.items.length} items. Updating...`);
 
             const result = await sendOrdersToLabelApp([order]);

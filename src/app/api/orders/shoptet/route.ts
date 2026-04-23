@@ -46,12 +46,14 @@ export async function POST(request: NextRequest) {
 
     for (const orderData of orders) {
       try {
-        const { orderNumber, totalPrice, items } = orderData;
+        const { orderNumber, totalPrice, items, orderDate } = orderData;
 
         if (!orderNumber || !items || !Array.isArray(items)) {
           results.errors.push(`Invalid order data for ${orderNumber || "unknown"}`);
           continue;
         }
+
+        const parsedDate = orderDate ? new Date(orderDate) : new Date();
 
         // Check if order exists
         const existingOrder = await prisma.order.findUnique({
@@ -93,10 +95,10 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // Update total price
+          // Update total price and date
           await prisma.order.update({
             where: { id: existingOrder.id },
-            data: { totalPrice: totalPrice || null },
+            data: { totalPrice: totalPrice || null, emailDate: parsedDate },
           });
 
           results.updated++;
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
           const order = await prisma.order.create({
             data: {
               orderNumber,
-              emailDate: new Date(), // Use current date for Shoptet imports
+              emailDate: parsedDate,
               totalPrice: totalPrice || null,
               rawEmail: null,
             },
