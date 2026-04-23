@@ -17,6 +17,16 @@ interface StockProduct {
   expirations: ExpirationDate[];
 }
 
+interface Prediction {
+  overallDate: string | null;
+  trendingDate: string | null;
+  overallVelocity: number | null;
+  trendingVelocity: number | null;
+  totalSold: number;
+  orderCount: number;
+  atRisk: boolean;
+}
+
 function getExpirationColor(dateStr: string): "red" | "yellow" | "green" {
   const now = new Date();
   const expDate = new Date(dateStr);
@@ -46,13 +56,15 @@ export default function StockPage() {
   const [editingExp, setEditingExp] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editCount, setEditCount] = useState("");
-  const [sortBy, setSortBy] = useState<"date" | "name" | "count">("date");
+  const [sortBy, setSortBy] = useState<"date" | "name" | "count" | "soldout">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterRedExp, setFilterRedExp] = useState(false);
   const [filterYellowExp, setFilterYellowExp] = useState(false);
+  const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
 
   useEffect(() => {
     fetchProducts();
+    fetchPredictions();
   }, []);
 
   async function fetchProducts() {
@@ -62,6 +74,16 @@ export default function StockPage() {
       if (Array.isArray(data)) setProducts(data);
     } catch {
       setMessage({ type: "error", text: "Chyba při načítání produktů" });
+    }
+  }
+
+  async function fetchPredictions() {
+    try {
+      const res = await fetch("/api/stock/predictions");
+      const data = await res.json();
+      if (data && typeof data === "object" && !data.error) setPredictions(data);
+    } catch {
+      // Predictions are non-critical
     }
   }
 
@@ -149,7 +171,7 @@ export default function StockPage() {
     setEditCount(String(exp.count));
   }
 
-  function handleSort(column: "date" | "name" | "count") {
+  function handleSort(column: "date" | "name" | "count" | "soldout") {
     if (sortBy === column) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -158,9 +180,16 @@ export default function StockPage() {
     }
   }
 
-  function getSortIndicator(column: "date" | "name" | "count") {
+  function getSortIndicator(column: "date" | "name" | "count" | "soldout") {
     if (sortBy !== column) return " ↕";
     return sortDir === "asc" ? " ↑" : " ↓";
+  }
+
+  function getPredictionDate(product: StockProduct): Date | null {
+    const pred = predictions[product.productName];
+    if (!pred) return null;
+    const dateStr = pred.trendingDate || pred.overallDate;
+    return dateStr ? new Date(dateStr) : null;
   }
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -170,6 +199,19 @@ export default function StockPage() {
     }
     if (sortBy === "count") {
       return dir * (a.totalCount - b.totalCount);
+    }
+    if (sortBy === "soldout") {
+      const predA = predictions[a.productName];
+      const predB = predictions[b.productName];
+      // At-risk products first when ascending
+      if (predA?.atRisk && !predB?.atRisk) return -1 * dir;
+      if (!predA?.atRisk && predB?.atRisk) return 1 * dir;
+      const dateA = getPredictionDate(a);
+      const dateB = getPredictionDate(b);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dir * (dateA.getTime() - dateB.getTime());
     }
     // date: sort by earliest expiration
     const aDate = a.expirations[0]?.expirationDate;
@@ -191,6 +233,8 @@ export default function StockPage() {
 
   const totalProducts = filteredProducts.length;
   const totalPieces = filteredProducts.reduce((sum, p) => sum + p.totalCount, 0);
+  const atRiskProducts = products.filter((p) => predictions[p.productName]?.atRisk);
+  const atRiskCount = atRiskProducts.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -221,6 +265,18 @@ export default function StockPage() {
         >
           {message.text}
           <button onClick={() => setMessage(null)} className="ml-2 font-bold">×</button>
+        </div>
+      )}
+
+      {/* At-risk flash message */}
+      {atRiskCount > 0 && (
+        <div className="max-w-7xl mx-auto px-4 mt-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-red-800">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <span className="text-sm font-medium">
+              {atRiskCount} {atRiskCount === 1 ? "produkt se nestihne vyprodat" : atRiskCount < 5 ? "produkty se nestihnou vyprodat" : "produktů se nestihne vyprodat"} před datem trvanlivosti!
+            </span>
+          </div>
         </div>
       )}
 
@@ -273,6 +329,12 @@ export default function StockPage() {
                   onClick={() => handleSort("date")}
                 >
                   Trvanlivosti{getSortIndicator("date")}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-sm font-medium text-gray-600 w-48 cursor-pointer hover:text-gray-900 select-none"
+                  onClick={() => handleSort("soldout")}
+                >
+                  Předpokládaný vyprodej{getSortIndicator("soldout")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 w-20">Akce</th>
               </tr>
@@ -404,6 +466,41 @@ export default function StockPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
+                      {(() => {
+                        const pred = predictions[product.productName];
+                        if (!pred || (!pred.overallDate && !pred.trendingDate)) {
+                          return <span className="text-xs text-gray-400 italic">Žádná data</span>;
+                        }
+                        return (
+                          <div className="space-y-1">
+                            {pred.trendingDate && (
+                              <div className="flex items-center gap-1">
+                                <span className={`text-xs font-medium ${pred.atRisk ? "text-red-700" : "text-gray-700"}`}>
+                                  📈 {formatDate(pred.trendingDate)}
+                                </span>
+                                {pred.atRisk && (
+                                  <span title="Nestihne se vyprodat před expirací!"><AlertTriangle className="w-4 h-4 text-red-500" /></span>
+                                )}
+                              </div>
+                            )}
+                            {pred.overallDate && (
+                              <div className="flex items-center gap-1">
+                                <span className={`text-xs ${pred.trendingDate ? "text-gray-400" : pred.atRisk ? "text-red-700 font-medium" : "text-gray-700 font-medium"}`}>
+                                  📊 {formatDate(pred.overallDate)}
+                                </span>
+                                {!pred.trendingDate && pred.atRisk && (
+                                  <span title="Nestihne se vyprodat před expirací!"><AlertTriangle className="w-4 h-4 text-red-500" /></span>
+                                )}
+                              </div>
+                            )}
+                            <span className="text-[10px] text-gray-400">
+                              {pred.totalSold} ks prodáno ({pred.orderCount} obj.)
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3">
                       {addingTo !== product.id && (
                         unassigned > 0 ? (
                           <button
@@ -423,7 +520,7 @@ export default function StockPage() {
               })}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                     Žádné produkty. Produkty budou synchronizovány z Shoptetu.
                   </td>
                 </tr>
