@@ -59,6 +59,8 @@ export default function StockPage() {
   const [editingExp, setEditingExp] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editCount, setEditCount] = useState("");
+  const [editingStock, setEditingStock] = useState<string | null>(null);
+  const [editStockCount, setEditStockCount] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name" | "count" | "soldout">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterRedExp, setFilterRedExp] = useState(false);
@@ -167,6 +169,32 @@ export default function StockPage() {
       fetchProducts();
     } catch {
       setMessage({ type: "error", text: "Chyba při potvrzení" });
+    }
+  }
+
+  async function updateStockCount(productId: string) {
+    const count = parseInt(editStockCount, 10);
+    if (isNaN(count) || count < 0) {
+      setMessage({ type: "error", text: "Neplatný počet" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/stock", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, totalCount: count }),
+      });
+      if (res.ok) {
+        setEditingStock(null);
+        setEditStockCount("");
+        fetchProducts();
+        fetchPredictions();
+      } else {
+        const err = await res.json();
+        setMessage({ type: "error", text: err.error || "Chyba" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při úpravě počtu" });
     }
   }
 
@@ -380,7 +408,36 @@ export default function StockPage() {
                       <span className="font-medium text-sm">{product.productName}</span>
                     </td>
                     <td className="px-4 py-3 text-sm font-mono font-bold">
-                      {product.totalCount}
+                      {editingStock === product.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={editStockCount}
+                            onChange={(e) => setEditStockCount(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") updateStockCount(product.id);
+                              if (e.key === "Escape") { setEditingStock(null); setEditStockCount(""); }
+                            }}
+                            className="w-16 border rounded px-1 py-0.5 text-sm text-center"
+                            autoFocus
+                          />
+                          <button onClick={() => updateStockCount(product.id)} className="text-green-600 hover:text-green-800 cursor-pointer">
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => { setEditingStock(null); setEditStockCount(""); }} className="text-gray-400 hover:text-gray-600 cursor-pointer text-xs">
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:text-blue-600 hover:underline"
+                          title="Klikněte pro úpravu počtu"
+                          onClick={() => { setEditingStock(product.id); setEditStockCount(String(product.totalCount)); }}
+                        >
+                          {product.totalCount}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1.5">

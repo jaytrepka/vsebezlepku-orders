@@ -128,3 +128,51 @@ async function upsertProduct(productName: string, totalCount: number, code: stri
     include: { expirations: { orderBy: { expirationDate: "asc" } } },
   });
 }
+
+// PATCH - Manually update totalCount for a stock product
+export async function PATCH(request: NextRequest) {
+  try {
+    const { id, totalCount } = await request.json();
+    if (!id || totalCount === undefined || totalCount < 0) {
+      return NextResponse.json({ error: "id and totalCount (>= 0) required" }, { status: 400 });
+    }
+
+    const existing = await prisma.stockProduct.findUnique({
+      where: { id },
+      include: { expirations: { orderBy: { expirationDate: "asc" } } },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    const diff = existing.totalCount - totalCount;
+    if (diff > 0) {
+      // FIFO: subtract from soonest-expiring batches
+      let remaining = diff;
+      for (const exp of existing.expirations) {
+        if (remaining <= 0) break;
+        if (exp.count <= remaining) {
+          remaining -= exp.count;
+          await prisma.expirationDate.delete({ where: { id: exp.id } });
+        } else {
+          await prisma.expirationDate.update({
+            where: { id: exp.id },
+            data: { count: exp.count - remaining },
+          });
+          remaining = 0;
+        }
+      }
+    }
+
+    const product = await prisma.stockProduct.update({
+      where: { id },
+      data: { totalCount },
+      include: { expirations: { orderBy: { expirationDate: "asc" } } },
+    });
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error("Stock patch error:", error);
+    return NextResponse.json({ error: "Failed to update stock" }, { status: 500 });
+  }
+}
