@@ -61,6 +61,7 @@ export default function StockPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterRedExp, setFilterRedExp] = useState(false);
   const [filterYellowExp, setFilterYellowExp] = useState(false);
+  const [filterAtRisk, setFilterAtRisk] = useState(false);
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
 
   useEffect(() => {
@@ -223,13 +224,17 @@ export default function StockPage() {
     return dir * (new Date(aDate).getTime() - new Date(bDate).getTime());
   });
 
-  const filteredProducts = (filterRedExp || filterYellowExp)
-    ? sortedProducts.filter((p) =>
-        p.expirations.some((e) => {
+  const filteredProducts = (filterRedExp || filterYellowExp || filterAtRisk)
+    ? sortedProducts.filter((p) => {
+        const expMatch = p.expirations.some((e) => {
           const color = getExpirationColor(e.expirationDate);
           return (filterRedExp && color === "red") || (filterYellowExp && color === "yellow");
-        })
-      )
+        });
+        const riskMatch = filterAtRisk && predictions[p.productName]?.atRisk;
+        if (filterAtRisk && (filterRedExp || filterYellowExp)) return expMatch || riskMatch;
+        if (filterAtRisk) return riskMatch;
+        return expMatch;
+      })
     : sortedProducts;
 
   const totalProducts = filteredProducts.length;
@@ -303,6 +308,16 @@ export default function StockPage() {
             />
             <span className="inline-block w-3 h-3 rounded-full bg-yellow-400" />
             1–2 měsíce
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filterAtRisk}
+              onChange={(e) => setFilterAtRisk(e.target.checked)}
+              className="w-4 h-4 rounded cursor-pointer accent-red-700"
+            />
+            <AlertTriangle className="w-4 h-4 text-red-500" />
+            Nestihne se vyprodat
           </label>
         </div>
       </div>
