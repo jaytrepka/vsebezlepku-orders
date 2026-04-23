@@ -15,7 +15,8 @@ interface Prediction {
   totalSold: number;
   orderCount: number;
   atRisk: boolean; // trending date (or overall if no trending) > earliest expiration
-  unsoldCount: number | null; // estimated pieces remaining at earliest expiration
+  unsoldCountTrending: number | null;
+  unsoldCountOverall: number | null;
 }
 
 function normalizeProductName(name: string): string {
@@ -69,7 +70,8 @@ export async function GET() {
           totalSold: 0,
           orderCount: 0,
           atRisk: false,
-          unsoldCount: null,
+          unsoldCountTrending: null,
+          unsoldCountOverall: null,
         };
         continue;
       }
@@ -120,13 +122,17 @@ export async function GET() {
         ? relevantDate.getTime() > new Date(earliestExpiration).getTime()
         : false;
 
-      // Compute unsold count at earliest expiration
-      let unsoldCount: number | null = null;
-      if (atRisk && earliestExpiration) {
+      // Compute unsold counts at earliest expiration for both velocities
+      let unsoldCountTrending: number | null = null;
+      let unsoldCountOverall: number | null = null;
+      if (earliestExpiration) {
         const daysUntilExpiration = Math.max(0, (new Date(earliestExpiration).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        const velocity = trendingVelocity || overallVelocity;
-        const soldByExpiration = Math.floor(velocity * daysUntilExpiration);
-        unsoldCount = Math.max(0, product.totalCount - soldByExpiration);
+        const soldByOverall = Math.floor(overallVelocity * daysUntilExpiration);
+        unsoldCountOverall = Math.max(0, product.totalCount - soldByOverall);
+        if (trendingVelocity) {
+          const soldByTrending = Math.floor(trendingVelocity * daysUntilExpiration);
+          unsoldCountTrending = Math.max(0, product.totalCount - soldByTrending);
+        }
       }
 
       predictions[product.productName] = {
@@ -138,7 +144,8 @@ export async function GET() {
         totalSold,
         orderCount: sortedDates.length,
         atRisk,
-        unsoldCount,
+        unsoldCountTrending,
+        unsoldCountOverall,
       };
     }
 

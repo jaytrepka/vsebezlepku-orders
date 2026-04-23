@@ -25,7 +25,8 @@ interface Prediction {
   totalSold: number;
   orderCount: number;
   atRisk: boolean;
-  unsoldCount: number | null;
+  unsoldCountTrending: number | null;
+  unsoldCountOverall: number | null;
 }
 
 function getExpirationColor(dateStr: string): "red" | "yellow" | "green" {
@@ -497,8 +498,8 @@ export default function StockPage() {
                                 {pred.atRisk && (
                                   <span className="flex items-center gap-1" title="Nestihne se vyprodat před expirací!">
                                     <AlertTriangle className="w-4 h-4 text-red-500" />
-                                    {pred.unsoldCount != null && (
-                                      <span className="text-xs font-bold text-red-600">{pred.unsoldCount} ks</span>
+                                    {pred.unsoldCountTrending != null && (
+                                      <span className="text-xs font-bold text-red-600">{pred.unsoldCountTrending} ks</span>
                                     )}
                                   </span>
                                 )}
@@ -509,12 +510,14 @@ export default function StockPage() {
                                 <span className={`text-xs ${pred.trendingDate ? "text-gray-400" : pred.atRisk ? "text-red-700 font-medium" : "text-gray-700 font-medium"}`}>
                                   📊 {formatDate(pred.overallDate)}
                                 </span>
+                                {pred.unsoldCountOverall != null && pred.unsoldCountOverall > 0 && (
+                                  <span className={`text-xs font-bold ${pred.trendingDate ? "text-gray-400" : "text-red-600"}`}>
+                                    {pred.unsoldCountOverall} ks
+                                  </span>
+                                )}
                                 {!pred.trendingDate && pred.atRisk && (
-                                  <span className="flex items-center gap-1" title="Nestihne se vyprodat před expirací!">
+                                  <span title="Nestihne se vyprodat před expirací!">
                                     <AlertTriangle className="w-4 h-4 text-red-500" />
-                                    {pred.unsoldCount != null && (
-                                      <span className="text-xs font-bold text-red-600">{pred.unsoldCount} ks</span>
-                                    )}
                                   </span>
                                 )}
                               </div>
