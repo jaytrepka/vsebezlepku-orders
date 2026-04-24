@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, Plus, Trash2, AlertTriangle, Check } from "lucide-react";
+import { shortenProductName } from "@/lib/productNames";
 
 interface ExpirationDate {
   id: string;
@@ -405,7 +406,7 @@ export default function StockPage() {
                 return (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <span className="font-medium text-sm">{product.productName}</span>
+                      <span className="font-medium text-sm">{shortenProductName(product.productName)}</span>
                     </td>
                     <td className="px-4 py-3 text-sm font-mono font-bold">
                       {editingStock === product.id ? (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Package, FileText, Plus, Trash2, Printer, Edit2 } from "lucide-react";
+import { shortenProductName } from "@/lib/productNames";
 
 interface ProductLabel {
   id: string;
@@ -579,7 +580,7 @@ export default function Home() {
                           )}
                           <span className="font-medium whitespace-nowrap">{item.quantity}×</span>
                           <span className="break-words" title={item.productName}>
-                            {item.productName}
+                            {shortenProductName(item.productName)}
                           </span>
                           {(() => {
                             const langLabel = getLabelForProduct(item);

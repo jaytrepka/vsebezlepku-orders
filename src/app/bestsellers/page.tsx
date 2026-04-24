@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TrendingUp } from "lucide-react";
+import { shortenProductName } from "@/lib/productNames";
 
 interface ProductSales {
   productName: string;
@@ -127,7 +128,7 @@ export default function BestsellersPage() {
                             className="absolute inset-y-0 left-0 bg-green-50 rounded"
                             style={{ width: `${barWidth}%` }}
                           />
-                          <span className="relative font-medium text-sm">{product.productName}</span>
+                          <span className="relative font-medium text-sm">{shortenProductName(product.productName)}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 font-mono">
