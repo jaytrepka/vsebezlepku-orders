@@ -28,17 +28,23 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      // Aggregate by product name
-      const agg = new Map<string, { productCode: string | null; totalQuantity: number; orderCount: number }>();
+      // Aggregate by product code first (merge same product), fall back to name
+      const agg = new Map<string, { productName: string; productCode: string | null; totalQuantity: number; orderCount: number }>();
       for (const item of items) {
-        const name = item.productName;
-        const existing = agg.get(name);
+        // Use product code as key if available, otherwise product name
+        const key = item.productCode || item.productName;
+        const existing = agg.get(key);
         if (existing) {
           existing.totalQuantity += item.quantity;
           existing.orderCount += 1;
+          // Prefer the longer/newer product name
+          if (item.productName.length > existing.productName.length) {
+            existing.productName = item.productName;
+          }
           if (!existing.productCode && item.productCode) existing.productCode = item.productCode;
         } else {
-          agg.set(name, {
+          agg.set(key, {
+            productName: item.productName,
             productCode: item.productCode,
             totalQuantity: item.quantity,
             orderCount: 1,
@@ -47,8 +53,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Sort by total quantity and take top N
-      const sorted = [...agg.entries()]
-        .map(([productName, data]) => ({ productName, ...data }))
+      const sorted = [...agg.values()]
         .sort((a, b) => b.totalQuantity - a.totalQuantity)
         .slice(0, limit);
 
