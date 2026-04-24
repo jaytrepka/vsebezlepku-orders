@@ -34,11 +34,26 @@ export async function POST(request: NextRequest) {
     const labelMap = new Map<string, typeof allLabels[0]>();
     for (const label of allLabels) {
       labelMap.set(label.productName, label);
+      // Also index by stripped brand prefix for fuzzy matching
+      const stripped = stripBrandPrefix(label.productName);
+      if (stripped !== label.productName && !labelMap.has(stripped)) {
+        labelMap.set(stripped, label);
+      }
     }
 
     // Helper to normalize product name (removes "Pomozte neplýtvat" suffix)
     function normalizeProductName(name: string): string {
       return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "").trim();
+    }
+
+    // Strip brand prefix + "bezlepkové" to get core product name for fuzzy matching
+    function stripBrandPrefix(name: string): string {
+      return name
+        .replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "")
+        .replace(/^(Piaceri Mediterranei|Massimo Zero|Bauer|Glutiniente)\s*/i, "")
+        .replace(/bezlepkov[áéý]\s*/i, "")
+        .replace(/bezlepkové\s*/i, "")
+        .trim();
     }
 
     // Build label requests
@@ -58,15 +73,17 @@ export async function POST(request: NextRequest) {
           // For Czech, use the linked label directly
           label = item.label;
         } else if (item.label) {
-          // For other languages, find label with same productName as Czech label
+          // For other languages, try multiple lookups in order of specificity
           label = labelMap.get(item.label.productName)
-            || labelMap.get(normalizeProductName(item.label.productName));
+            || labelMap.get(normalizeProductName(item.label.productName))
+            || labelMap.get(stripBrandPrefix(item.label.productName));
         }
         
         // Also try direct lookup by item's productName (for cases without Czech label)
         if (!label && language !== "cs") {
           label = labelMap.get(item.productName)
-            || labelMap.get(normalizeProductName(item.productName));
+            || labelMap.get(normalizeProductName(item.productName))
+            || labelMap.get(stripBrandPrefix(item.productName));
         }
 
         // Skip items without labels
