@@ -68,6 +68,7 @@ export default function StockPage() {
   const [filterYellowExp, setFilterYellowExp] = useState(false);
   const [filterAtRisk, setFilterAtRisk] = useState(false);
   const [filterAtRiskOverall, setFilterAtRiskOverall] = useState(false);
+  const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
 
   useEffect(() => {
@@ -226,6 +227,29 @@ export default function StockPage() {
     return dateStr ? new Date(dateStr) : null;
   }
 
+  const BRANDS: { key: string; label: string; pattern: RegExp; color: string }[] = [
+    { key: "pm", label: "PM", pattern: /Piaceri Mediterranei/i, color: "bg-blue-100 text-blue-700 border-blue-300 accent-blue-500" },
+    { key: "mz", label: "MZ", pattern: /Massimo Zero/i, color: "bg-purple-100 text-purple-700 border-purple-300 accent-purple-500" },
+    { key: "bauer", label: "Bauer", pattern: /Bauer/i, color: "bg-teal-100 text-teal-700 border-teal-300 accent-teal-500" },
+    { key: "glutiniente", label: "Glutiniente", pattern: /Glutiniente/i, color: "bg-amber-100 text-amber-700 border-amber-300 accent-amber-500" },
+  ];
+
+  function getProductBrand(productName: string): string | null {
+    for (const brand of BRANDS) {
+      if (brand.pattern.test(productName)) return brand.key;
+    }
+    return null;
+  }
+
+  function toggleBrand(key: string) {
+    setFilterBrands(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   const sortedProducts = [...products].sort((a, b) => {
     const dir = sortDir === "asc" ? 1 : -1;
     if (sortBy === "name") {
@@ -256,17 +280,28 @@ export default function StockPage() {
     return dir * (new Date(aDate).getTime() - new Date(bDate).getTime());
   });
 
-  const anyFilter = filterRedExp || filterYellowExp || filterAtRisk || filterAtRiskOverall;
+  const anyTimeRiskFilter = filterRedExp || filterYellowExp || filterAtRisk || filterAtRiskOverall;
+  const anyBrandFilter = filterBrands.size > 0;
+  const anyFilter = anyTimeRiskFilter || anyBrandFilter;
   const filteredProducts = anyFilter
     ? sortedProducts.filter((p) => {
-        const expMatch = p.expirations.some((e) => {
-          const color = getExpirationColor(e.expirationDate);
-          return (filterRedExp && color === "red") || (filterYellowExp && color === "yellow");
-        });
-        const pred = predictions[p.productName];
-        const riskMatch = filterAtRisk && pred?.atRisk;
-        const riskOverallMatch = filterAtRiskOverall && pred?.atRiskOverall;
-        return expMatch || riskMatch || riskOverallMatch;
+        // Brand filter (OR between brands)
+        const brandMatch = !anyBrandFilter || filterBrands.has(getProductBrand(p.productName) || "");
+
+        // Time/risk filter (OR between time/risk options)
+        const timeRiskMatch = !anyTimeRiskFilter || (() => {
+          const expMatch = p.expirations.some((e) => {
+            const color = getExpirationColor(e.expirationDate);
+            return (filterRedExp && color === "red") || (filterYellowExp && color === "yellow");
+          });
+          const pred = predictions[p.productName];
+          const riskMatch = filterAtRisk && pred?.atRisk;
+          const riskOverallMatch = filterAtRiskOverall && pred?.atRiskOverall;
+          return expMatch || riskMatch || riskOverallMatch;
+        })();
+
+        // AND between brand group and time/risk group
+        return brandMatch && timeRiskMatch;
       })
     : sortedProducts;
 
@@ -362,6 +397,20 @@ export default function StockPage() {
             <AlertTriangle className="w-4 h-4 text-orange-400" />
             Nestihne se vyprodat (📊 celkově)
           </label>
+          <span className="border-l border-gray-300 h-6" />
+          {BRANDS.map((brand) => (
+            <label key={brand.key} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filterBrands.has(brand.key)}
+                onChange={() => toggleBrand(brand.key)}
+                className={`w-4 h-4 rounded cursor-pointer ${brand.color.split(" ").find(c => c.startsWith("accent-")) || ""}`}
+              />
+              <span className={`text-xs px-1.5 py-0.5 rounded border ${brand.color.split(" ").filter(c => !c.startsWith("accent-")).join(" ")}`}>
+                {brand.label}
+              </span>
+            </label>
+          ))}
         </div>
       </div>
 
