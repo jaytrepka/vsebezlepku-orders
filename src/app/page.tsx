@@ -74,23 +74,36 @@ export default function Home() {
     return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "").trim();
   }
 
+  // Strip brand prefix + "bezlepkové" to get core product name for fuzzy matching
+  function stripBrandPrefix(name: string): string {
+    return name
+      .replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "")
+      .replace(/^(Piaceri Mediterranei|Massimo Zero|Bauer|Glutiniente)\s*/i, "")
+      .replace(/bezlepkov[áéý]\s*/i, "")
+      .replace(/bezlepkové\s*/i, "")
+      .trim();
+  }
+
   function getLabelForProduct(item: OrderItem): ProductLabel | null {
     if (labelLanguage === "cs") {
       return item.label || null;
     }
-    // For other languages, try multiple lookups:
-    // 1. By Czech label's productName (exact)
-    // 2. By Czech label's productName (normalized, without "Pomozte neplýtvat")
-    // 3. By item's productName (exact)
-    // 4. By item's productName (normalized)
+    // Try multiple lookups in order of specificity:
+    const namesToTry: string[] = [];
     if (item.label) {
-      const found = languageLabels.get(item.label.productName)
-        || languageLabels.get(normalizeProductName(item.label.productName));
+      namesToTry.push(item.label.productName);
+      namesToTry.push(normalizeProductName(item.label.productName));
+      namesToTry.push(stripBrandPrefix(item.label.productName));
+    }
+    namesToTry.push(item.productName);
+    namesToTry.push(normalizeProductName(item.productName));
+    namesToTry.push(stripBrandPrefix(item.productName));
+
+    for (const name of namesToTry) {
+      const found = languageLabels.get(name);
       if (found) return found;
     }
-    return languageLabels.get(item.productName)
-      || languageLabels.get(normalizeProductName(item.productName))
-      || null;
+    return null;
   }
 
   // Calculate total items to print (from selected orders, excluding unchecked items and items without labels in selected language)
@@ -124,6 +137,11 @@ export default function Home() {
       const map = new Map<string, ProductLabel>();
       for (const label of data) {
         map.set(label.productName, label);
+        // Also index by stripped brand prefix for fuzzy matching
+        const stripped = stripBrandPrefix(label.productName);
+        if (stripped !== label.productName && !map.has(stripped)) {
+          map.set(stripped, label);
+        }
       }
       setLanguageLabels(map);
     }
