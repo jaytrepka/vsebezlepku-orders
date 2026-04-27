@@ -480,6 +480,22 @@ export default function Home() {
               <Package className="w-7 h-7 text-blue-600" />
               VšeBezLepku Objednávky
             </h1>
+            <div className="flex items-center gap-1">
+              {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"]] as const).map(([lang, flag]) => (
+                <button
+                  key={lang}
+                  onClick={() => setLabelLanguage(lang)}
+                  className={`text-2xl px-2 py-1 rounded cursor-pointer transition-all ${
+                    labelLanguage === lang
+                      ? "bg-blue-100 ring-2 ring-blue-500 scale-110"
+                      : "opacity-50 hover:opacity-80 hover:bg-gray-100"
+                  }`}
+                  title={lang.toUpperCase()}
+                >
+                  {flag}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </header>
@@ -536,23 +552,6 @@ export default function Home() {
               ✕
             </button>
           )}
-
-          <div className="flex items-center gap-1">
-            {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"]] as const).map(([lang, flag]) => (
-              <button
-                key={lang}
-                onClick={() => setLabelLanguage(lang)}
-                className={`text-2xl px-2 py-1 rounded cursor-pointer transition-all ${
-                  labelLanguage === lang
-                    ? "bg-blue-100 ring-2 ring-blue-500 scale-110"
-                    : "opacity-50 hover:opacity-80 hover:bg-gray-100"
-                }`}
-                title={lang.toUpperCase()}
-              >
-                {flag}
-              </button>
-            ))}
-          </div>
 
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Počáteční pozice:</label>
