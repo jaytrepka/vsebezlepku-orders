@@ -7,8 +7,9 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const perPage = Math.max(1, Math.min(100, parseInt(searchParams.get("perPage") || "10", 10)));
     const month = searchParams.get("month"); // format: "2026-03" (YYYY-MM)
+    const search = searchParams.get("search")?.trim();
 
-    const where: { emailDate?: { gte: Date; lt: Date } } = {};
+    const where: { emailDate?: { gte: Date; lt: Date }; orderNumber?: { contains: string; mode: "insensitive" } } = {};
     if (month) {
       const [year, mon] = month.split("-").map(Number);
       if (year && mon) {
@@ -16,6 +17,9 @@ export async function GET(request: NextRequest) {
         const end = new Date(year, mon, 1);
         where.emailDate = { gte: start, lt: end };
       }
+    }
+    if (search) {
+      where.orderNumber = { contains: search, mode: "insensitive" };
     }
 
     const [orders, total] = await Promise.all([

@@ -39,6 +39,7 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [filterMonth, setFilterMonth] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
@@ -115,7 +116,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchOrders();
-  }, [currentPage, perPage, filterMonth]);
+  }, [currentPage, perPage, filterMonth, searchQuery]);
 
   useEffect(() => {
     fetchAvailableMonths();
@@ -169,6 +170,7 @@ export default function Home() {
   async function fetchOrders() {
     const params = new URLSearchParams({ page: String(currentPage), perPage: String(perPage) });
     if (filterMonth) params.set("month", filterMonth);
+    if (searchQuery) params.set("search", searchQuery);
     const res = await fetch(`/api/orders?${params}`);
     const data = await res.json();
     if (data.orders && Array.isArray(data.orders)) {
@@ -320,6 +322,56 @@ export default function Home() {
     }
   }
 
+  function renderPagination(position: "top" | "bottom") {
+    if (totalOrders <= 0) return null;
+    const totalPages = Math.ceil(totalOrders / perPage);
+    return (
+      <div className={`flex items-center justify-between px-4 py-3 bg-gray-50 ${position === "top" ? "border-b" : "border-t"}`}>
+        <div className="text-sm text-gray-600">
+          Zobrazeno {Math.min((currentPage - 1) * perPage + 1, totalOrders)}–{Math.min(currentPage * perPage, totalOrders)} z {totalOrders} objednávek
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 text-sm border rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ← Předchozí
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+            .reduce<(number | string)[]>((acc, p, i, arr) => {
+              if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...");
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p, i) =>
+              typeof p === "string" ? (
+                <span key={`${position}-dots-${i}`} className="px-1 text-gray-400">…</span>
+              ) : (
+                <button
+                  key={`${position}-${p}`}
+                  onClick={() => setCurrentPage(p)}
+                  className={`px-3 py-1 text-sm border rounded ${
+                    p === currentPage ? "bg-blue-600 text-white" : "hover:bg-gray-100"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="px-3 py-1 text-sm border rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Další →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function openLabelModal(productName: string, existingLabel?: ProductLabel | null, productUrl?: string, language: "cs" | "pl" | "sk" = "cs") {
     setLabelModal({ open: true, productName, productUrl, isEdit: !!existingLabel, language });
     if (existingLabel) {
@@ -438,6 +490,17 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Hledat:</label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="Číslo objednávky..."
+              className="border rounded px-2 py-1 w-44"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Měsíc:</label>
             <select
               value={filterMonth}
@@ -515,6 +578,7 @@ export default function Home() {
       {/* Orders List */}
       <div className="max-w-7xl mx-auto px-4 pb-8">
         <div className="bg-white rounded-lg shadow overflow-hidden">
+          {renderPagination("top")}
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -695,55 +759,7 @@ export default function Home() {
             </tbody>
           </table>
 
-          {/* Pagination */}
-          {totalOrders > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
-              <div className="text-sm text-gray-600">
-                Zobrazeno {Math.min((currentPage - 1) * perPage + 1, totalOrders)}–{Math.min(currentPage * perPage, totalOrders)} z {totalOrders} objednávek
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm border rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  ← Předchozí
-                </button>
-                {Array.from({ length: Math.ceil(totalOrders / perPage) }, (_, i) => i + 1)
-                  .filter((p) => {
-                    const total = Math.ceil(totalOrders / perPage);
-                    return p === 1 || p === total || Math.abs(p - currentPage) <= 2;
-                  })
-                  .reduce<(number | string)[]>((acc, p, i, arr) => {
-                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...");
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((p, i) =>
-                    typeof p === "string" ? (
-                      <span key={`dots-${i}`} className="px-1 text-gray-400">…</span>
-                    ) : (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p)}
-                        className={`px-3 py-1 text-sm border rounded ${
-                          p === currentPage ? "bg-blue-600 text-white" : "hover:bg-gray-100"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalOrders / perPage), p + 1))}
-                  disabled={currentPage >= Math.ceil(totalOrders / perPage)}
-                  className="px-3 py-1 text-sm border rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Další →
-                </button>
-              </div>
-            </div>
-          )}
+          {renderPagination("bottom")}
         </div>
       </div>
 
