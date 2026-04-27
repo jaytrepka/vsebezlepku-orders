@@ -327,8 +327,19 @@ export default function Home() {
     const totalPages = Math.ceil(totalOrders / perPage);
     return (
       <div className={`flex items-center justify-between px-4 py-3 bg-gray-50 ${position === "top" ? "border-b" : "border-t"}`}>
-        <div className="text-sm text-gray-600">
-          Zobrazeno {Math.min((currentPage - 1) * perPage + 1, totalOrders)}–{Math.min(currentPage * perPage, totalOrders)} z {totalOrders} objednávek
+        <div className="flex items-center gap-3 text-sm text-gray-600">
+          <span>
+            Zobrazeno {Math.min((currentPage - 1) * perPage + 1, totalOrders)}–{Math.min(currentPage * perPage, totalOrders)} z {totalOrders}
+          </span>
+          <select
+            value={perPage}
+            onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
+            className="border rounded px-1 py-0.5 text-sm"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -516,18 +527,15 @@ export default function Home() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Na stránku:</label>
-            <select
-              value={perPage}
-              onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
-              className="border rounded px-2 py-1"
+          {(searchQuery || filterMonth) && (
+            <button
+              onClick={() => { setSearchQuery(""); setFilterMonth(""); setCurrentPage(1); }}
+              className="text-gray-400 hover:text-red-500 text-lg font-bold cursor-pointer"
+              title="Zrušit filtry"
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
+              ✕
+            </button>
+          )}
 
           <div className="flex items-center gap-1">
             {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"]] as const).map(([lang, flag]) => (
