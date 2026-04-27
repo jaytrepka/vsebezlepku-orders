@@ -529,17 +529,21 @@ export default function Home() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Jazyk štítků:</label>
-            <select
-              value={labelLanguage}
-              onChange={(e) => setLabelLanguage(e.target.value as "cs" | "pl" | "sk")}
-              className="border rounded px-2 py-1"
-            >
-              <option value="cs">🇨🇿 Čeština</option>
-              <option value="pl">🇵🇱 Polski</option>
-              <option value="sk">🇸🇰 Slovenčina</option>
-            </select>
+          <div className="flex items-center gap-1">
+            {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"]] as const).map(([lang, flag]) => (
+              <button
+                key={lang}
+                onClick={() => setLabelLanguage(lang)}
+                className={`text-2xl px-2 py-1 rounded cursor-pointer transition-all ${
+                  labelLanguage === lang
+                    ? "bg-blue-100 ring-2 ring-blue-500 scale-110"
+                    : "opacity-50 hover:opacity-80 hover:bg-gray-100"
+                }`}
+                title={lang.toUpperCase()}
+              >
+                {flag}
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-2">
