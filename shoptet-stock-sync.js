@@ -50,7 +50,7 @@
                 const stock = stockInput.value.trim();
                 const stockNum = parseInt(stock, 10);
 
-                if (code && !isNaN(stockNum) && stockNum > 0) {
+                if (code && !isNaN(stockNum) && stockNum >= 0) {
                     let productName = "";
                     if (nameStrong) {
                         productName = nameStrong.innerText.trim();
