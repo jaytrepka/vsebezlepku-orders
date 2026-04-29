@@ -70,6 +70,7 @@ export default function StockPage() {
   const [filterAtRisk, setFilterAtRisk] = useState(false);
   const [filterAtRiskOverall, setFilterAtRiskOverall] = useState(false);
   const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
+  const [showSoldOut, setShowSoldOut] = useState(false);
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
   const [chartModal, setChartModal] = useState<{
     productName: string;
@@ -347,8 +348,9 @@ export default function StockPage() {
   const anyTimeRiskFilter = filterRedExp || filterYellowExp || filterAtRisk || filterAtRiskOverall;
   const anyBrandFilter = filterBrands.size > 0;
   const anyFilter = anyTimeRiskFilter || anyBrandFilter;
+  const baseProducts = showSoldOut ? sortedProducts : sortedProducts.filter((p) => p.totalCount > 0);
   const filteredProducts = anyFilter
-    ? sortedProducts.filter((p) => {
+    ? baseProducts.filter((p) => {
         // Brand filter (OR between brands)
         const brandMatch = !anyBrandFilter || filterBrands.has(getProductBrand(p.productName) || "");
 
@@ -367,7 +369,7 @@ export default function StockPage() {
         // AND between brand group and time/risk group
         return brandMatch && timeRiskMatch;
       })
-    : sortedProducts;
+    : baseProducts;
 
   const totalProducts = filteredProducts.length;
   const totalPieces = filteredProducts.reduce((sum, p) => sum + p.totalCount, 0);
@@ -475,6 +477,16 @@ export default function StockPage() {
               </span>
             </label>
           ))}
+          <span className="border-l border-gray-300 h-6" />
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showSoldOut}
+              onChange={(e) => setShowSoldOut(e.target.checked)}
+              className="w-4 h-4 rounded cursor-pointer accent-gray-500"
+            />
+            Zobrazit vyprodané
+          </label>
         </div>
       </div>
 
