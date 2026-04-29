@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Plus, Trash2, AlertTriangle, Check } from "lucide-react";
+import { Calendar, Plus, Trash2, AlertTriangle, Check, X } from "lucide-react";
 import { shortenProductName } from "@/lib/productNames";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface ExpirationDate {
   id: string;
@@ -70,6 +71,8 @@ export default function StockPage() {
   const [filterAtRiskOverall, setFilterAtRiskOverall] = useState(false);
   const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
+  const [chartModal, setChartModal] = useState<{ productName: string; data: { date: string; quantity: number }[] } | null>(null);
+  const [chartLoading, setChartLoading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -94,6 +97,40 @@ export default function StockPage() {
     } catch {
       // Predictions are non-critical
     }
+  }
+
+  async function openSalesChart(productName: string) {
+    setChartLoading(true);
+    setChartModal({ productName, data: [] });
+    try {
+      const res = await fetch(`/api/stock/sales-history?productName=${encodeURIComponent(productName)}`);
+      const data = await res.json();
+      if (data.history) {
+        // Aggregate by week for cleaner chart when there's lots of data
+        const history: { date: string; quantity: number }[] = data.history;
+        if (history.length > 60) {
+          // Group by week
+          const weekly = new Map<string, number>();
+          for (const entry of history) {
+            const d = new Date(entry.date);
+            const weekStart = new Date(d);
+            weekStart.setDate(d.getDate() - d.getDay() + 1);
+            const key = weekStart.toISOString().split("T")[0];
+            weekly.set(key, (weekly.get(key) || 0) + entry.quantity);
+          }
+          const weeklyData = [...weekly.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([date, quantity]) => ({ date, quantity }));
+          setChartModal({ productName, data: weeklyData });
+        } else {
+          setChartModal({ productName, data: history });
+        }
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při načítání historie prodejů" });
+      setChartModal(null);
+    }
+    setChartLoading(false);
   }
 
   async function addExpiration(stockProductId: string) {
@@ -602,7 +639,7 @@ export default function StockPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 cursor-pointer hover:bg-blue-50 transition-colors" onClick={() => openSalesChart(product.productName)}>
                       {(() => {
                         const pred = predictions[product.productName];
                         if (!pred || (!pred.overallDate && !pred.trendingDate)) {
@@ -678,6 +715,54 @@ export default function StockPage() {
           </table>
         </div>
       </div>
+
+      {/* Sales Chart Modal */}
+      {chartModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setChartModal(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                📊 {shortenProductName(chartModal.productName)}
+              </h2>
+              <button onClick={() => setChartModal(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {chartLoading ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">Načítám data...</div>
+            ) : chartModal.data.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-gray-400">Žádná historie prodejů</div>
+            ) : (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartModal.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(d: string) => {
+                        const date = new Date(d);
+                        return `${date.getDate()}.${date.getMonth() + 1}.`;
+                      }}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip
+                      labelFormatter={(d) => new Date(String(d)).toLocaleDateString("cs-CZ")}
+                      formatter={(value) => [`${value} ks`, "Prodáno"]}
+                    />
+                    <Line type="monotone" dataKey="quantity" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            {chartModal.data.length > 0 && (
+              <div className="mt-3 text-xs text-gray-400 text-center">
+                {chartModal.data.length > 60 ? "Zobrazeno po týdnech" : "Zobrazeno po dnech"} • Celkem {chartModal.data.reduce((s, d) => s + d.quantity, 0)} ks
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
