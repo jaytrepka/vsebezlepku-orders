@@ -71,7 +71,11 @@ export default function StockPage() {
   const [filterAtRiskOverall, setFilterAtRiskOverall] = useState(false);
   const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
-  const [chartModal, setChartModal] = useState<{ productName: string; data: { date: string; quantity: number }[] } | null>(null);
+  const [chartModal, setChartModal] = useState<{
+    productName: string;
+    data: { date: string; quantity: number }[];
+    stats?: { avgPerMonth: number; avgLastYear: number; avgLastHalf: number; avgLast3: number };
+  } | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
 
   useEffect(() => {
@@ -106,10 +110,33 @@ export default function StockPage() {
       const res = await fetch(`/api/stock/sales-history?productName=${encodeURIComponent(productName)}`);
       const data = await res.json();
       if (data.history) {
-        // Aggregate by week for cleaner chart when there's lots of data
         const history: { date: string; quantity: number }[] = data.history;
+
+        // Compute monthly averages
+        const now = new Date();
+        const totalQty = history.reduce((s, h) => s + h.quantity, 0);
+        const firstDate = history.length > 0 ? new Date(history[0].date) : now;
+        const totalMonths = Math.max(1, (now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+        const avgPerMonth = totalQty / totalMonths;
+
+        function avgForPeriod(months: number) {
+          const cutoff = new Date(now);
+          cutoff.setMonth(cutoff.getMonth() - months);
+          const filtered = history.filter((h) => new Date(h.date) >= cutoff);
+          const qty = filtered.reduce((s, h) => s + h.quantity, 0);
+          const actualMonths = Math.max(1, (now.getTime() - cutoff.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+          return qty / actualMonths;
+        }
+
+        const stats = {
+          avgPerMonth: Math.round(avgPerMonth * 10) / 10,
+          avgLastYear: Math.round(avgForPeriod(12) * 10) / 10,
+          avgLastHalf: Math.round(avgForPeriod(6) * 10) / 10,
+          avgLast3: Math.round(avgForPeriod(3) * 10) / 10,
+        };
+
+        // Aggregate by week for cleaner chart when there's lots of data
         if (history.length > 60) {
-          // Group by week
           const weekly = new Map<string, number>();
           for (const entry of history) {
             const d = new Date(entry.date);
@@ -121,9 +148,9 @@ export default function StockPage() {
           const weeklyData = [...weekly.entries()]
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([date, quantity]) => ({ date, quantity }));
-          setChartModal({ productName, data: weeklyData });
+          setChartModal({ productName, data: weeklyData, stats });
         } else {
-          setChartModal({ productName, data: history });
+          setChartModal({ productName, data: history, stats });
         }
       }
     } catch {
@@ -756,8 +783,30 @@ export default function StockPage() {
               </div>
             )}
             {chartModal.data.length > 0 && (
-              <div className="mt-3 text-xs text-gray-400 text-center">
-                {chartModal.data.length > 60 ? "Zobrazeno po týdnech" : "Zobrazeno po dnech"} • Celkem {chartModal.data.reduce((s, d) => s + d.quantity, 0)} ks
+              <div className="mt-4 space-y-2">
+                <div className="text-xs text-gray-400 text-center">
+                  {chartModal.data.length > 60 ? "Zobrazeno po týdnech" : "Zobrazeno po dnech"} • Celkem {chartModal.data.reduce((s, d) => s + d.quantity, 0)} ks
+                </div>
+                {chartModal.stats && (
+                  <div className="grid grid-cols-4 gap-3 mt-3">
+                    <div className="bg-gray-50 rounded p-2 text-center">
+                      <div className="text-lg font-bold text-gray-800">{chartModal.stats.avgPerMonth}</div>
+                      <div className="text-[10px] text-gray-500">ks/měsíc celkem</div>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2 text-center">
+                      <div className="text-lg font-bold text-gray-800">{chartModal.stats.avgLastYear}</div>
+                      <div className="text-[10px] text-gray-500">ks/měsíc (rok)</div>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2 text-center">
+                      <div className="text-lg font-bold text-blue-700">{chartModal.stats.avgLastHalf}</div>
+                      <div className="text-[10px] text-gray-500">ks/měsíc (půlrok)</div>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2 text-center">
+                      <div className="text-lg font-bold text-blue-900">{chartModal.stats.avgLast3}</div>
+                      <div className="text-[10px] text-gray-500">ks/měsíc (3 měs.)</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

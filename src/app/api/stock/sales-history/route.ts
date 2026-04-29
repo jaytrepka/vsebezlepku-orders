@@ -15,52 +15,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "productName required" }, { status: 400 });
     }
 
+    const normalized = normalizeProductName(productName);
+
     // Get the stock product to find its code
     const stockProduct = await prisma.stockProduct.findFirst({
       where: { productName },
     });
 
-    // Fetch all order items matching this product
-    const normalized = normalizeProductName(productName);
+    // Fetch all order items and filter in JS (same approach as predictions)
     const orderItems = await prisma.orderItem.findMany({
-      where: {
-        OR: [
-          { productName: productName },
-          { productName: normalized },
-          ...(stockProduct?.code ? [{ productCode: stockProduct.code }] : []),
-        ],
-      },
-      select: {
-        quantity: true,
-        order: { select: { emailDate: true } },
-      },
-    });
-
-    // Also find items with "Pomozte neplýtvat" suffix
-    const neplytvatItems = await prisma.orderItem.findMany({
-      where: {
-        productName: { endsWith: "- Pomozte neplýtvat" },
-        AND: {
-          productName: { contains: normalized.substring(0, 30) },
-        },
-      },
       select: {
         productName: true,
+        productCode: true,
         quantity: true,
         order: { select: { emailDate: true } },
       },
     });
 
-    // Filter neplýtvat items to only those that actually match
-    const matchingNeplyvat = neplytvatItems.filter(
-      (item) => normalizeProductName(item.productName) === normalized
-    );
-
-    const allItems = [...orderItems, ...matchingNeplyvat];
+    // Match items by normalized name or product code
+    const matchingItems = orderItems.filter((item) => {
+      const itemNormalized = normalizeProductName(item.productName);
+      if (itemNormalized === normalized || itemNormalized === productName) return true;
+      if (stockProduct?.code && item.productCode === stockProduct.code) return true;
+      return false;
+    });
 
     // Aggregate by day
     const dailySales = new Map<string, number>();
-    for (const item of allItems) {
+    for (const item of matchingItems) {
       const day = item.order.emailDate.toISOString().split("T")[0];
       dailySales.set(day, (dailySales.get(day) || 0) + item.quantity);
     }
