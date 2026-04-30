@@ -74,10 +74,11 @@ export default function StockPage() {
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
   const [chartModal, setChartModal] = useState<{
     productName: string;
-    data: { date: string; quantity: number }[];
-    stats?: { avgPerMonth: number; avgLastYear: number; avgLastHalf: number; avgLast3: number };
+    rawHistory: { date: string; quantity: number }[];
+    stats?: { avgPerMonth: number | null; avgLastYear: number | null; avgLastHalf: number | null; avgLast3: number | null; monthsOfData: number };
   } | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
+  const [chartView, setChartView] = useState<"days" | "months">("days");
 
   useEffect(() => {
     fetchProducts();
@@ -106,59 +107,93 @@ export default function StockPage() {
 
   async function openSalesChart(productName: string) {
     setChartLoading(true);
-    setChartModal({ productName, data: [] });
+    setChartView("days");
+    setChartModal({ productName, rawHistory: [] });
     try {
       const res = await fetch(`/api/stock/sales-history?productName=${encodeURIComponent(productName)}`);
       const data = await res.json();
       if (data.history) {
         const history: { date: string; quantity: number }[] = data.history;
 
-        // Compute monthly averages
+        // Compute monthly averages (only show relevant ones)
         const now = new Date();
-        const totalQty = history.reduce((s, h) => s + h.quantity, 0);
         const firstDate = history.length > 0 ? new Date(history[0].date) : now;
-        const totalMonths = Math.max(1, (now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
-        const avgPerMonth = totalQty / totalMonths;
+        const monthsOfData = Math.max(0.5, (now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+        const totalQty = history.reduce((s, h) => s + h.quantity, 0);
+        const avgPerMonth = Math.round((totalQty / monthsOfData) * 10) / 10;
 
-        function avgForPeriod(months: number) {
+        function avgForPeriod(months: number): number | null {
+          if (monthsOfData < months * 0.8) return null; // Not enough data
           const cutoff = new Date(now);
           cutoff.setMonth(cutoff.getMonth() - months);
           const filtered = history.filter((h) => new Date(h.date) >= cutoff);
           const qty = filtered.reduce((s, h) => s + h.quantity, 0);
           const actualMonths = Math.max(1, (now.getTime() - cutoff.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
-          return qty / actualMonths;
+          return Math.round((qty / actualMonths) * 10) / 10;
         }
 
         const stats = {
-          avgPerMonth: Math.round(avgPerMonth * 10) / 10,
-          avgLastYear: Math.round(avgForPeriod(12) * 10) / 10,
-          avgLastHalf: Math.round(avgForPeriod(6) * 10) / 10,
-          avgLast3: Math.round(avgForPeriod(3) * 10) / 10,
+          avgPerMonth,
+          avgLastYear: avgForPeriod(12),
+          avgLastHalf: avgForPeriod(6),
+          avgLast3: avgForPeriod(3),
+          monthsOfData: Math.round(monthsOfData * 10) / 10,
         };
 
-        // Aggregate by week for cleaner chart when there's lots of data
-        if (history.length > 60) {
-          const weekly = new Map<string, number>();
-          for (const entry of history) {
-            const d = new Date(entry.date);
-            const weekStart = new Date(d);
-            weekStart.setDate(d.getDate() - d.getDay() + 1);
-            const key = weekStart.toISOString().split("T")[0];
-            weekly.set(key, (weekly.get(key) || 0) + entry.quantity);
-          }
-          const weeklyData = [...weekly.entries()]
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([date, quantity]) => ({ date, quantity }));
-          setChartModal({ productName, data: weeklyData, stats });
-        } else {
-          setChartModal({ productName, data: history, stats });
-        }
+        setChartModal({ productName, rawHistory: history, stats });
       }
     } catch {
       setMessage({ type: "error", text: "Chyba při načítání historie prodejů" });
       setChartModal(null);
     }
     setChartLoading(false);
+  }
+
+  // Prepare chart data from raw history based on view mode, filling gaps for linear axis
+  function getChartData(): { date: string; quantity: number }[] {
+    if (!chartModal || chartModal.rawHistory.length === 0) return [];
+    const history = chartModal.rawHistory;
+
+    if (chartView === "months") {
+      // Group by month
+      const monthly = new Map<string, number>();
+      for (const entry of history) {
+        const d = new Date(entry.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        monthly.set(key, (monthly.get(key) || 0) + entry.quantity);
+      }
+      // Fill gaps between first and last month
+      const keys = [...monthly.keys()].sort();
+      const first = keys[0];
+      const last = keys[keys.length - 1];
+      const result: { date: string; quantity: number }[] = [];
+      const [fy, fm] = first.split("-").map(Number);
+      const [ly, lm] = last.split("-").map(Number);
+      let y = fy, m = fm;
+      while (y < ly || (y === ly && m <= lm)) {
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+        result.push({ date: key, quantity: monthly.get(key) || 0 });
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+      return result;
+    } else {
+      // Daily view - fill gaps
+      const dailyMap = new Map<string, number>();
+      for (const entry of history) {
+        dailyMap.set(entry.date, (dailyMap.get(entry.date) || 0) + entry.quantity);
+      }
+      const firstDate = new Date(history[0].date);
+      const lastDate = new Date(history[history.length - 1].date);
+      const result: { date: string; quantity: number }[] = [];
+      const d = new Date(firstDate);
+      while (d <= lastDate) {
+        const key = d.toISOString().split("T")[0];
+        result.push({ date: key, quantity: dailyMap.get(key) || 0 });
+        d.setDate(d.getDate() + 1);
+      }
+      return result;
+    }
   }
 
   async function addExpiration(stockProductId: string) {
@@ -767,56 +802,95 @@ export default function StockPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {chartLoading ? (
-              <div className="h-64 flex items-center justify-center text-gray-500">Načítám data...</div>
-            ) : chartModal.data.length === 0 ? (
-              <div className="h-64 flex items-center justify-center text-gray-400">Žádná historie prodejů</div>
-            ) : (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartModal.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(d: string) => {
-                        const date = new Date(d);
-                        return `${date.getDate()}.${date.getMonth() + 1}.`;
-                      }}
-                    />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip
-                      labelFormatter={(d) => new Date(String(d)).toLocaleDateString("cs-CZ")}
-                      formatter={(value) => [`${value} ks`, "Prodáno"]}
-                    />
-                    <Line type="monotone" dataKey="quantity" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+            {/* View toggle */}
+            {!chartLoading && chartModal.rawHistory.length > 0 && (
+              <div className="flex gap-1 mb-3">
+                <button
+                  onClick={() => setChartView("days")}
+                  className={`px-3 py-1 text-xs rounded cursor-pointer ${chartView === "days" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >
+                  Dny
+                </button>
+                <button
+                  onClick={() => setChartView("months")}
+                  className={`px-3 py-1 text-xs rounded cursor-pointer ${chartView === "months" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >
+                  Měsíce
+                </button>
               </div>
             )}
-            {chartModal.data.length > 0 && (
+            {chartLoading ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">Načítám data...</div>
+            ) : chartModal.rawHistory.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-gray-400">Žádná historie prodejů</div>
+            ) : (() => {
+              const chartData = getChartData();
+              return (
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(d: string) => {
+                          if (chartView === "months") {
+                            const [y, m] = d.split("-");
+                            return `${parseInt(m)}/${y.slice(2)}`;
+                          }
+                          const date = new Date(d);
+                          return `${date.getDate()}.${date.getMonth() + 1}.`;
+                        }}
+                        interval={chartView === "months" ? 0 : Math.max(0, Math.floor(chartData.length / 12) - 1)}
+                      />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip
+                        labelFormatter={(d) => {
+                          if (chartView === "months") {
+                            const [y, m] = String(d).split("-");
+                            return `${parseInt(m)}/${y}`;
+                          }
+                          return new Date(String(d)).toLocaleDateString("cs-CZ");
+                        }}
+                        formatter={(value) => [`${value} ks`, "Prodáno"]}
+                      />
+                      <Line type="monotone" dataKey="quantity" stroke="#2563eb" strokeWidth={2} dot={chartView === "months" ? { r: 3 } : false} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
+            {chartModal.rawHistory.length > 0 && (
               <div className="mt-4 space-y-2">
                 <div className="text-xs text-gray-400 text-center">
-                  {chartModal.data.length > 60 ? "Zobrazeno po týdnech" : "Zobrazeno po dnech"} • Celkem {chartModal.data.reduce((s, d) => s + d.quantity, 0)} ks
+                  {chartView === "months" ? "Zobrazeno po měsících" : "Zobrazeno po dnech"} • Celkem {chartModal.rawHistory.reduce((s, d) => s + d.quantity, 0)} ks
                 </div>
                 {chartModal.stats && (
-                  <div className="grid grid-cols-4 gap-3 mt-3">
-                    <div className="bg-gray-50 rounded p-2 text-center">
-                      <div className="text-lg font-bold text-gray-800">{chartModal.stats.avgPerMonth}</div>
-                      <div className="text-[10px] text-gray-500">ks/měsíc celkem</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2 text-center">
-                      <div className="text-lg font-bold text-gray-800">{chartModal.stats.avgLastYear}</div>
-                      <div className="text-[10px] text-gray-500">ks/měsíc (rok)</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2 text-center">
-                      <div className="text-lg font-bold text-blue-700">{chartModal.stats.avgLastHalf}</div>
-                      <div className="text-[10px] text-gray-500">ks/měsíc (půlrok)</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2 text-center">
-                      <div className="text-lg font-bold text-blue-900">{chartModal.stats.avgLast3}</div>
-                      <div className="text-[10px] text-gray-500">ks/měsíc (3 měs.)</div>
-                    </div>
+                  <div className={`grid gap-3 mt-3 ${[chartModal.stats.avgPerMonth, chartModal.stats.avgLastYear, chartModal.stats.avgLastHalf, chartModal.stats.avgLast3].filter(v => v !== null).length <= 2 ? "grid-cols-2" : [chartModal.stats.avgPerMonth, chartModal.stats.avgLastYear, chartModal.stats.avgLastHalf, chartModal.stats.avgLast3].filter(v => v !== null).length === 3 ? "grid-cols-3" : "grid-cols-4"}`}>
+                    {chartModal.stats.avgPerMonth !== null && (
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-lg font-bold text-gray-800">{chartModal.stats.avgPerMonth}</div>
+                        <div className="text-[10px] text-gray-500">ks/měsíc celkem</div>
+                      </div>
+                    )}
+                    {chartModal.stats.avgLastYear !== null && (
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-lg font-bold text-gray-800">{chartModal.stats.avgLastYear}</div>
+                        <div className="text-[10px] text-gray-500">ks/měsíc (rok)</div>
+                      </div>
+                    )}
+                    {chartModal.stats.avgLastHalf !== null && (
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-lg font-bold text-blue-700">{chartModal.stats.avgLastHalf}</div>
+                        <div className="text-[10px] text-gray-500">ks/měsíc (půlrok)</div>
+                      </div>
+                    )}
+                    {chartModal.stats.avgLast3 !== null && (
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-lg font-bold text-blue-900">{chartModal.stats.avgLast3}</div>
+                        <div className="text-[10px] text-gray-500">ks/měsíc (3 měs.)</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
