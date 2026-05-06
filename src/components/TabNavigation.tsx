@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Package, Calendar, TrendingUp } from "lucide-react";
+import { Package, Calendar, TrendingUp, Skull } from "lucide-react";
 
 export default function TabNavigation() {
   const pathname = usePathname();
@@ -29,6 +29,7 @@ export default function TabNavigation() {
     { href: "/", label: "Objednávky", icon: Package, badge: 0 },
     { href: "/stock", label: "Minimální trvanlivosti", icon: Calendar, badge: alertCount },
     { href: "/bestsellers", label: "Nejprodávanější", icon: TrendingUp, badge: 0 },
+    { href: "/blacklist", label: "Kurvy", icon: Skull, badge: 0 },
   ];
 
   return (
