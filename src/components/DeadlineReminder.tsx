@@ -30,10 +30,6 @@ export default function DeadlineReminder() {
         (t) => !t.done && t.deadline && t.deadline.split("T")[0] === today
       );
 
-      // Also check if already dismissed today
-      const dismissedKey = `todo-reminder-dismissed-${today}`;
-      if (sessionStorage.getItem(dismissedKey)) return;
-
       if (due.length > 0) setDueTasks(due);
     } catch {
       // ignore
@@ -41,8 +37,6 @@ export default function DeadlineReminder() {
   }
 
   function dismiss() {
-    const today = new Date().toISOString().split("T")[0];
-    sessionStorage.setItem(`todo-reminder-dismissed-${today}`, "true");
     setDismissed(true);
   }
 
