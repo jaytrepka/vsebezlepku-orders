@@ -120,7 +120,7 @@ export default function BestsellersPage() {
                   const barWidth = Math.round((product.totalQuantity / maxQty) * 100);
 
                   return (
-                    <tr key={product.productName} className="hover:bg-gray-50">
+                    <tr key={`${activePeriod}-${idx}`} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm text-gray-400 font-mono">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <div className="relative">
