@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Trash2, Pencil, Plus, X, Check, Circle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Trash2, Pencil, Plus, X, Check, Circle, CheckCircle2, GripVertical } from "lucide-react";
 
 interface Task {
   id: string;
@@ -9,6 +9,7 @@ interface Task {
   priority: "low" | "medium" | "high";
   deadline: string | null;
   done: boolean;
+  sortOrder: number;
   createdAt: string;
 }
 
@@ -37,8 +38,10 @@ export default function TodoPage() {
   const [editDeadline, setEditDeadline] = useState("");
   const [showDone, setShowDone] = useState(false);
   const [filterPriority, setFilterPriority] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"priority" | "deadline">("priority");
+  const [sortBy, setSortBy] = useState<"priority" | "deadline" | "custom">("custom");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragOverId = useRef<string | null>(null);
 
   useEffect(() => {
     fetchTasks();
@@ -129,6 +132,68 @@ export default function TodoPage() {
     setEditDeadline(task.deadline ? task.deadline.split("T")[0] : "");
   }
 
+  // Drag and drop handlers
+  function handleDragStart(taskId: string) {
+    setDragId(taskId);
+  }
+
+  function handleDragOver(e: React.DragEvent, taskId: string) {
+    e.preventDefault();
+    dragOverId.current = taskId;
+  }
+
+  async function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      return;
+    }
+
+    const dragTask = sorted.find((t) => t.id === dragId);
+    const targetTask = sorted.find((t) => t.id === targetId);
+    if (!dragTask || !targetTask) { setDragId(null); return; }
+
+    // Only allow reorder within same priority group
+    if (dragTask.priority !== targetTask.priority) { setDragId(null); return; }
+
+    // Get tasks in same priority group (from sorted list, non-done only)
+    const group = sorted.filter((t) => t.priority === dragTask.priority && !t.done);
+    const fromIdx = group.findIndex((t) => t.id === dragId);
+    const toIdx = group.findIndex((t) => t.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) { setDragId(null); return; }
+
+    // Reorder
+    const reordered = [...group];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+
+    // Assign new sortOrder values
+    const reorderPayload = reordered.map((t, i) => ({ id: t.id, sortOrder: i }));
+
+    // Optimistic update
+    setTasks((prev) => {
+      const updated = [...prev];
+      for (const item of reorderPayload) {
+        const idx = updated.findIndex((t) => t.id === item.id);
+        if (idx !== -1) updated[idx] = { ...updated[idx], sortOrder: item.sortOrder };
+      }
+      return updated;
+    });
+
+    setDragId(null);
+
+    // Persist
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reorder: reorderPayload }),
+      });
+    } catch {
+      fetchTasks(); // Revert on error
+    }
+  }
+
   // Filter and sort
   const filtered = tasks.filter((t) => {
     if (!showDone && t.done) return false;
@@ -138,8 +203,11 @@ export default function TodoPage() {
 
   const sorted = [...filtered].sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
-    if (sortBy === "priority") {
-      return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    if (sortBy === "priority" || sortBy === "custom") {
+      const priDiff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      if (priDiff !== 0) return priDiff;
+      // Within same priority, use sortOrder
+      return a.sortOrder - b.sortOrder;
     }
     // Sort by deadline
     if (!a.deadline && !b.deadline) return 0;
@@ -187,7 +255,7 @@ export default function TodoPage() {
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addTask()}
                 placeholder="Co je potřeba udělat..."
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full border rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
             <div>
@@ -195,7 +263,7 @@ export default function TodoPage() {
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as "low" | "medium" | "high")}
-                className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                className="border rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
                 <option value="high">Vysoká</option>
                 <option value="medium">Střední</option>
@@ -208,15 +276,15 @@ export default function TodoPage() {
                 type="date"
                 value={newDeadline}
                 onChange={(e) => setNewDeadline(e.target.value)}
-                className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="border rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
             <button
               onClick={addTask}
               disabled={!newTitle.trim()}
-              className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center gap-1 bg-blue-600 text-white px-5 py-2.5 rounded-lg text-base font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5" />
               Přidat
             </button>
           </div>
@@ -254,9 +322,10 @@ export default function TodoPage() {
             <span className="text-gray-500">Řadit:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "priority" | "deadline")}
+              onChange={(e) => setSortBy(e.target.value as "priority" | "deadline" | "custom")}
               className="border rounded px-2 py-1 text-sm cursor-pointer outline-none"
             >
+              <option value="custom">Vlastní pořadí</option>
               <option value="priority">Podle priority</option>
               <option value="deadline">Podle deadline</option>
             </select>
@@ -266,16 +335,25 @@ export default function TodoPage() {
 
       {/* Task list */}
       <div className="max-w-4xl mx-auto px-4 py-4">
-        <div className="space-y-2">
+        <div className="space-y-3">
           {sorted.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
+            <div className="bg-white rounded-lg shadow p-10 text-center text-gray-400 text-lg">
               Žádné úkoly. Všechno hotovo! 🎉
             </div>
           ) : (
             sorted.map((task) => (
               <div
                 key={task.id}
-                className={`bg-white rounded-lg shadow p-3 flex items-center gap-3 ${task.done ? "opacity-60" : ""} ${isOverdue(task) ? "border-l-4 border-red-500" : isToday(task) ? "border-l-4 border-yellow-500" : ""}`}
+                draggable={!task.done && sortBy !== "deadline"}
+                onDragStart={() => handleDragStart(task.id)}
+                onDragOver={(e) => handleDragOver(e, task.id)}
+                onDrop={(e) => handleDrop(e, task.id)}
+                onDragEnd={() => setDragId(null)}
+                className={`bg-white rounded-lg shadow px-4 py-4 flex items-center gap-4 transition-all ${
+                  task.done ? "opacity-50" : ""
+                } ${isOverdue(task) ? "border-l-4 border-red-500" : isToday(task) ? "border-l-4 border-yellow-500" : ""} ${
+                  dragId === task.id ? "opacity-40 scale-95" : ""
+                } ${dragId && dragId !== task.id && !task.done ? "hover:bg-blue-50" : ""}`}
               >
                 {editingId === task.id ? (
                   <div className="flex-1 flex items-center gap-3 flex-wrap">
@@ -283,12 +361,13 @@ export default function TodoPage() {
                       type="text"
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
-                      className="flex-1 min-w-[200px] border rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      onKeyDown={(e) => e.key === "Enter" && updateTask(task.id)}
+                      className="flex-1 min-w-[200px] border rounded px-3 py-2 text-base outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <select
                       value={editPriority}
                       onChange={(e) => setEditPriority(e.target.value as "low" | "medium" | "high")}
-                      className="border rounded px-2 py-1 text-sm cursor-pointer outline-none"
+                      className="border rounded px-3 py-2 text-sm cursor-pointer outline-none"
                     >
                       <option value="high">Vysoká</option>
                       <option value="medium">Střední</option>
@@ -298,43 +377,46 @@ export default function TodoPage() {
                       type="date"
                       value={editDeadline}
                       onChange={(e) => setEditDeadline(e.target.value)}
-                      className="border rounded px-2 py-1 text-sm outline-none"
+                      className="border rounded px-3 py-2 text-sm outline-none"
                     />
-                    <button onClick={() => updateTask(task.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded cursor-pointer">
-                      <Check className="w-4 h-4" />
+                    <button onClick={() => updateTask(task.id)} className="p-2 text-green-600 hover:bg-green-50 rounded cursor-pointer">
+                      <Check className="w-5 h-5" />
                     </button>
-                    <button onClick={() => setEditingId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded cursor-pointer">
-                      <X className="w-4 h-4" />
+                    <button onClick={() => setEditingId(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded cursor-pointer">
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
                 ) : (
                   <>
+                    {!task.done && sortBy !== "deadline" && (
+                      <GripVertical className="w-5 h-5 text-gray-300 cursor-grab flex-shrink-0" />
+                    )}
                     <button onClick={() => toggleDone(task)} className="flex-shrink-0 cursor-pointer">
                       {task.done ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        <CheckCircle2 className="w-6 h-6 text-green-500" />
                       ) : (
-                        <Circle className="w-5 h-5 text-gray-300 hover:text-blue-500" />
+                        <Circle className="w-6 h-6 text-gray-300 hover:text-blue-500" />
                       )}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <span className={`text-sm ${task.done ? "line-through text-gray-400" : "text-gray-900"}`}>
+                      <span className={`text-base ${task.done ? "line-through text-gray-400" : "text-gray-900"}`}>
                         {task.title}
                       </span>
                     </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${PRIORITY_COLORS[task.priority]}`}>
+                    <span className={`text-xs px-2.5 py-1 rounded border font-medium ${PRIORITY_COLORS[task.priority]}`}>
                       {PRIORITY_LABELS[task.priority]}
                     </span>
                     {task.deadline && (
-                      <span className={`text-xs ${isOverdue(task) ? "text-red-600 font-medium" : isToday(task) ? "text-yellow-600 font-medium" : "text-gray-500"}`}>
+                      <span className={`text-sm ${isOverdue(task) ? "text-red-600 font-medium" : isToday(task) ? "text-yellow-600 font-medium" : "text-gray-500"}`}>
                         {isOverdue(task) && "⚠️ "}
                         {new Date(task.deadline).toLocaleDateString("cs-CZ")}
                       </span>
                     )}
                     <div className="flex gap-1 flex-shrink-0">
-                      <button onClick={() => startEdit(task)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer">
+                      <button onClick={() => startEdit(task)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => deleteTask(task.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer">
+                      <button onClick={() => deleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -344,7 +426,7 @@ export default function TodoPage() {
             ))
           )}
         </div>
-        <div className="text-xs text-gray-400 mt-3 text-center">
+        <div className="text-sm text-gray-400 mt-4 text-center">
           {sorted.filter((t) => !t.done).length} aktivních úkolů
           {tasks.filter((t) => t.done).length > 0 && ` • ${tasks.filter((t) => t.done).length} dokončených`}
         </div>

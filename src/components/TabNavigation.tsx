@@ -8,10 +8,15 @@ import { Package, Calendar, TrendingUp, Skull, ListTodo } from "lucide-react";
 export default function TabNavigation() {
   const pathname = usePathname();
   const [alertCount, setAlertCount] = useState(0);
+  const [todoCount, setTodoCount] = useState(0);
 
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 60000);
+    fetchTodoCount();
+    const interval = setInterval(() => {
+      fetchAlerts();
+      fetchTodoCount();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -25,11 +30,21 @@ export default function TabNavigation() {
     }
   }
 
+  async function fetchTodoCount() {
+    try {
+      const res = await fetch("/api/tasks/count");
+      const data = await res.json();
+      setTodoCount(data.count || 0);
+    } catch {
+      // ignore
+    }
+  }
+
   const tabs = [
     { href: "/", label: "Objednávky", icon: Package, badge: 0 },
     { href: "/stock", label: "Minimální trvanlivosti", icon: Calendar, badge: alertCount },
     { href: "/bestsellers", label: "Nejprodávanější", icon: TrendingUp, badge: 0 },
-    { href: "/todo", label: "TODO", icon: ListTodo, badge: 0 },
+    { href: "/todo", label: "TODO", icon: ListTodo, badge: todoCount },
     { href: "/blacklist", label: "Kurvy", icon: Skull, badge: 0 },
   ];
 

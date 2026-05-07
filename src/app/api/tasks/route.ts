@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const tasks = await prisma.task.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
     return NextResponse.json(tasks);
   } catch (error) {
@@ -24,11 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
+    // Get max sortOrder for this priority to append at end
+    const maxOrder = await prisma.task.aggregate({
+      _max: { sortOrder: true },
+      where: { priority: priority || "medium" },
+    });
+
     const task = await prisma.task.create({
       data: {
         title: title.trim(),
         priority: priority || "medium",
         deadline: deadline ? new Date(deadline) : null,
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
       },
     });
     return NextResponse.json(task);
@@ -38,11 +45,22 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Update a task
+// PUT - Update a task (including reorder)
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, title, priority, deadline, done } = body;
+    const { id, title, priority, deadline, done, reorder } = body;
+
+    // Bulk reorder: [{id, sortOrder}, ...]
+    if (reorder && Array.isArray(reorder)) {
+      for (const item of reorder) {
+        await prisma.task.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
 
     if (!id) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
