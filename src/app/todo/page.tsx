@@ -247,7 +247,7 @@ export default function TodoPage() {
       <div className="max-w-4xl mx-auto px-4 pt-4">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex gap-3 items-end flex-wrap">
-            <div className="flex-1 min-w-[200px]">
+            <div className="flex-1 min-w-0 basis-full sm:basis-0">
               <label className="block text-xs text-gray-500 mb-1">Úkol</label>
               <input
                 type="text"

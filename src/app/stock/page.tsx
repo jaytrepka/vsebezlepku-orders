@@ -415,8 +415,8 @@ export default function StockPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Calendar className="w-7 h-7 text-blue-600" />
             Minimální trvanlivosti
           </h1>
@@ -456,8 +456,8 @@ export default function StockPage() {
       )}
 
       {/* Filters */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
-        <div className="bg-white rounded-lg shadow p-3 flex flex-wrap items-center gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-4">
+        <div className="bg-white rounded-lg shadow p-3 flex flex-wrap items-center gap-3 sm:gap-4">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
@@ -526,9 +526,10 @@ export default function StockPage() {
       </div>
 
       {/* Products list */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th
@@ -787,13 +788,14 @@ export default function StockPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
       {/* Sales Chart Modal */}
       {chartModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setChartModal(null)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-3xl p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">
                 📊 {shortenProductName(chartModal.productName)}

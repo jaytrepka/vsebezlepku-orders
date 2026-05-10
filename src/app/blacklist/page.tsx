@@ -110,7 +110,7 @@ export default function BlacklistPage() {
       {/* Add form */}
       <div className="max-w-4xl mx-auto px-4 pt-4">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex gap-3 items-end">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
             <div className="flex-1">
               <label className="block text-xs text-gray-500 mb-1">Jméno a příjmení</label>
               <input
@@ -146,14 +146,15 @@ export default function BlacklistPage() {
       </div>
 
       {/* List */}
-      <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4">
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {customers.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               Zatím žádné záznamy. Snad to tak zůstane! 🤞
             </div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Jméno</th>
@@ -232,6 +233,7 @@ export default function BlacklistPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
         <div className="text-xs text-gray-400 mt-2 text-center">

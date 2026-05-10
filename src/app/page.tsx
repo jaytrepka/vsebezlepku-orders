@@ -326,7 +326,7 @@ export default function Home() {
     if (totalOrders <= 0) return null;
     const totalPages = Math.ceil(totalOrders / perPage);
     return (
-      <div className={`flex items-center justify-between px-4 py-3 bg-gray-50 ${position === "top" ? "border-b" : "border-t"}`}>
+      <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 bg-gray-50 ${position === "top" ? "border-b" : "border-t"}`}>
         <div className="flex items-center gap-3 text-sm text-gray-600">
           <span>
             Zobrazeno {Math.min((currentPage - 1) * perPage + 1, totalOrders)}–{Math.min(currentPage * perPage, totalOrders)} z {totalOrders}
@@ -474,9 +474,9 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Package className="w-7 h-7 text-blue-600" />
               VšeBezLepku Objednávky
             </h1>
@@ -514,7 +514,7 @@ export default function Home() {
       )}
 
       {/* Controls */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
         <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Hledat:</label>
@@ -587,10 +587,11 @@ export default function Home() {
       </div>
 
       {/* Orders List */}
-      <div className="max-w-7xl mx-auto px-4 pb-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-8">
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {renderPagination("top")}
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left">
@@ -769,6 +770,7 @@ export default function Home() {
               )}
             </tbody>
           </table>
+          </div>
 
           {renderPagination("bottom")}
         </div>

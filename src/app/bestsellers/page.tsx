@@ -47,8 +47,8 @@ export default function BestsellersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <TrendingUp className="w-7 h-7 text-green-600" />
             Nejprodávanější
           </h1>
@@ -58,7 +58,7 @@ export default function BestsellersPage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-4">
         <div className="bg-white rounded-lg shadow p-3 flex flex-wrap items-center gap-4">
           {/* Period tabs */}
           <div className="flex gap-1">
@@ -97,14 +97,15 @@ export default function BestsellersPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-gray-400">Načítání...</div>
           ) : !period || period.products.length === 0 ? (
             <div className="p-8 text-center text-gray-400">Žádná data pro toto období</div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 w-12">#</th>
@@ -145,6 +146,7 @@ export default function BestsellersPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
