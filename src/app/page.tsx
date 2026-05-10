@@ -42,6 +42,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [selectedParcelOrders, setSelectedParcelOrders] = useState<string[]>([]);
   const [excludedItems, setExcludedItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [startPosition, setStartPosition] = useState(1);
@@ -322,6 +323,23 @@ export default function Home() {
     }
   }
 
+  function toggleParcelOrder(orderId: string) {
+    setSelectedParcelOrders((prev) =>
+      prev.includes(orderId)
+        ? prev.filter((id) => id !== orderId)
+        : [...prev, orderId]
+    );
+  }
+
+  function openParcelLabels() {
+    const orderNumbers = orders
+      .filter((o) => selectedParcelOrders.includes(o.id))
+      .map((o) => o.orderNumber);
+    if (orderNumbers.length === 0) return;
+    const url = `https://go-balik.cz/klient/objednavky/tisk-stitky?id_orders=${orderNumbers.join(",")}&url=https://www.vsebezlepku.cz&pozice=${startPosition}`;
+    window.open(url, "_blank");
+  }
+
   function renderPagination(position: "top" | "bottom") {
     if (totalOrders <= 0) return null;
     const totalPages = Math.ceil(totalOrders / perPage);
@@ -574,6 +592,15 @@ export default function Home() {
             Generovat štítky ({itemsToPrint} ks)
           </button>
 
+          <button
+            onClick={openParcelLabels}
+            disabled={selectedParcelOrders.length === 0}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <Package className="w-4 h-4" />
+            Otevřít štítky na balík ({selectedParcelOrders.length})
+          </button>
+
           {selectedOrders.length > 0 && (
             <button
               onClick={deleteOrders}
@@ -612,6 +639,9 @@ export default function Home() {
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
                   Celkem
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-600">
+                  📦 Balík
                 </th>
               </tr>
             </thead>
@@ -759,11 +789,19 @@ export default function Home() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">{order.totalPrice || "-"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedParcelOrders.includes(order.id)}
+                      onChange={() => toggleParcelOrder(order.id)}
+                      className="rounded w-5 h-5 cursor-pointer accent-purple-600"
+                    />
+                  </td>
                 </tr>
               ))}
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     Žádné objednávky. Synchronizujte emaily pro načtení objednávek.
                   </td>
                 </tr>
