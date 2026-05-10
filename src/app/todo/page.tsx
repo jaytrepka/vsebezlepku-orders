@@ -349,7 +349,7 @@ export default function TodoPage() {
                 onDragOver={(e) => handleDragOver(e, task.id)}
                 onDrop={(e) => handleDrop(e, task.id)}
                 onDragEnd={() => setDragId(null)}
-                className={`bg-white rounded-lg shadow px-4 py-4 flex items-center gap-4 transition-all ${
+                className={`bg-white rounded-lg shadow px-3 sm:px-4 py-3 sm:py-4 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4 transition-all ${
                   task.done ? "opacity-50" : ""
                 } ${isOverdue(task) ? "border-l-4 border-red-500" : isToday(task) ? "border-l-4 border-yellow-500" : ""} ${
                   dragId === task.id ? "opacity-40 scale-95" : ""
@@ -389,7 +389,7 @@ export default function TodoPage() {
                 ) : (
                   <>
                     {!task.done && sortBy !== "deadline" && (
-                      <GripVertical className="w-5 h-5 text-gray-300 cursor-grab flex-shrink-0" />
+                      <GripVertical className="w-5 h-5 text-gray-300 cursor-grab flex-shrink-0 hidden sm:block" />
                     )}
                     <button onClick={() => toggleDone(task)} className="flex-shrink-0 cursor-pointer">
                       {task.done ? (
@@ -398,27 +398,29 @@ export default function TodoPage() {
                         <Circle className="w-6 h-6 text-gray-300 hover:text-blue-500" />
                       )}
                     </button>
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-base ${task.done ? "line-through text-gray-400" : "text-gray-900"}`}>
+                    <div className="flex-1 min-w-0 basis-[calc(100%-4rem)] sm:basis-0">
+                      <span className={`text-sm sm:text-base ${task.done ? "line-through text-gray-400" : "text-gray-900"}`}>
                         {task.title}
                       </span>
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded border font-medium ${PRIORITY_COLORS[task.priority]}`}>
-                      {PRIORITY_LABELS[task.priority]}
-                    </span>
-                    {task.deadline && (
-                      <span className={`text-sm ${isOverdue(task) ? "text-red-600 font-medium" : isToday(task) ? "text-yellow-600 font-medium" : "text-gray-500"}`}>
-                        {isOverdue(task) && "⚠️ "}
-                        {new Date(task.deadline).toLocaleDateString("cs-CZ")}
+                    <div className="flex items-center gap-2 ml-8 sm:ml-0 flex-shrink-0">
+                      <span className={`text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded border font-medium whitespace-nowrap ${PRIORITY_COLORS[task.priority]}`}>
+                        {PRIORITY_LABELS[task.priority]}
                       </span>
-                    )}
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button onClick={() => startEdit(task)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => deleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {task.deadline && (
+                        <span className={`text-xs sm:text-sm whitespace-nowrap ${isOverdue(task) ? "text-red-600 font-medium" : isToday(task) ? "text-yellow-600 font-medium" : "text-gray-500"}`}>
+                          {isOverdue(task) && "⚠️ "}
+                          {new Date(task.deadline).toLocaleDateString("cs-CZ")}
+                        </span>
+                      )}
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => startEdit(task)} className="p-1.5 sm:p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteTask(task.id)} className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
