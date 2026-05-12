@@ -24,6 +24,53 @@ function normalizeProductName(name: string): string {
   return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").trim();
 }
 
+// FIFO batch simulation: process expiration batches in order,
+// sell at given velocity between each expiration date, count waste
+function calculateBatchWaste(
+  expirations: Array<{ count: number; expirationDate: Date }>,
+  velocity: number,
+  today: Date
+): number {
+  if (expirations.length === 0) return 0;
+
+  const batches = expirations
+    .map((e) => ({ count: e.count, expDate: new Date(e.expirationDate) }))
+    .sort((a, b) => a.expDate.getTime() - b.expDate.getTime());
+
+  if (velocity <= 0) {
+    return batches.reduce((sum, b) => sum + b.count, 0);
+  }
+
+  let totalWaste = 0;
+  let lastDate = today;
+
+  for (let i = 0; i < batches.length; i++) {
+    if (batches[i].expDate.getTime() <= today.getTime()) {
+      // Already expired
+      totalWaste += batches[i].count;
+      batches[i].count = 0;
+      continue;
+    }
+
+    const days = (batches[i].expDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+    let piecesSold = velocity * days;
+
+    // Sell from current batch first (expiring soonest), then later ones
+    for (let j = i; j < batches.length && piecesSold > 0; j++) {
+      const taken = Math.min(batches[j].count, piecesSold);
+      batches[j].count -= taken;
+      piecesSold -= taken;
+    }
+
+    // Whatever remains in this batch is wasted (just expired)
+    totalWaste += batches[i].count;
+    batches[i].count = 0;
+    lastDate = batches[i].expDate;
+  }
+
+  return Math.ceil(totalWaste);
+}
+
 // GET - Compute predicted sold-out dates for all stock products
 export async function GET() {
   try {
@@ -132,28 +179,24 @@ export async function GET() {
         trendingDate = new Date(today.getTime() + trendingDaysToSellOut * 24 * 60 * 60 * 1000);
       }
 
-      // Check if at risk: predicted sold-out > earliest expiration
-      const earliestExpiration = product.expirations[0]?.expirationDate;
-      const relevantDate = trendingDate || overallDate;
-      const atRisk = earliestExpiration
-        ? relevantDate.getTime() > new Date(earliestExpiration).getTime()
-        : false;
-      const atRiskOverall = earliestExpiration
-        ? overallDate.getTime() > new Date(earliestExpiration).getTime()
-        : false;
+      // Calculate waste using batch-by-batch FIFO simulation
+      const expirationBatches = product.expirations.map((e) => ({
+        count: e.count,
+        expirationDate: new Date(e.expirationDate),
+      }));
 
-      // Compute unsold counts at earliest expiration for both velocities
       let unsoldCountTrending: number | null = null;
       let unsoldCountOverall: number | null = null;
-      if (earliestExpiration) {
-        const daysUntilExpiration = Math.max(0, (new Date(earliestExpiration).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        const soldByOverall = Math.floor(overallVelocity * daysUntilExpiration);
-        unsoldCountOverall = Math.max(0, product.totalCount - soldByOverall);
-        if (trendingVelocity) {
-          const soldByTrending = Math.floor(trendingVelocity * daysUntilExpiration);
-          unsoldCountTrending = Math.max(0, product.totalCount - soldByTrending);
-        }
+
+      unsoldCountOverall = calculateBatchWaste(expirationBatches, overallVelocity, today);
+      if (trendingVelocity) {
+        unsoldCountTrending = calculateBatchWaste(expirationBatches, trendingVelocity, today);
       }
+
+      const atRisk = trendingVelocity
+        ? (unsoldCountTrending ?? 0) > 0
+        : unsoldCountOverall > 0;
+      const atRiskOverall = unsoldCountOverall > 0;
 
       predictions[product.productName] = {
         productName: product.productName,
