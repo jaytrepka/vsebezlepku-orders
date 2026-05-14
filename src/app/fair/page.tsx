@@ -270,7 +270,7 @@ export default function FairPage() {
     const bRemaining = b.totalCount - b.soldCount;
     if (aRemaining === 0 && bRemaining > 0) return 1;
     if (bRemaining === 0 && aRemaining > 0) return -1;
-    return a.productName.localeCompare(b.productName, "cs");
+    return shortenBrand(a.productName).localeCompare(shortenBrand(b.productName), "cs");
   });
   const transactions = fairData?.transactions || [];
 
