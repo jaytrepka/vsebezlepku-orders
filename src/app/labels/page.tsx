@@ -105,9 +105,9 @@ export default function LabelsPage() {
       const data = await res.json();
       const map = new Map<string, ProductLabel>();
       for (const label of data) {
-        map.set(label.productName, label);
-        map.set(stripBrandPrefix(label.productName), label);
-        map.set(normalizeProductName(label.productName), label);
+        map.set(label.productName.toLowerCase(), label);
+        map.set(stripBrandPrefix(label.productName).toLowerCase(), label);
+        map.set(normalizeProductName(label.productName).toLowerCase(), label);
       }
       setLabels(map);
     } catch {
@@ -116,9 +116,9 @@ export default function LabelsPage() {
   }
 
   function getLabelForProduct(productName: string): ProductLabel | null {
-    return labels.get(productName)
-      || labels.get(normalizeProductName(productName))
-      || labels.get(stripBrandPrefix(productName))
+    return labels.get(productName.toLowerCase())
+      || labels.get(normalizeProductName(productName).toLowerCase())
+      || labels.get(stripBrandPrefix(productName).toLowerCase())
       || null;
   }
 
