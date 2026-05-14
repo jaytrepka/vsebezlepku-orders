@@ -48,6 +48,14 @@ interface StockProduct {
   productName: string;
 }
 
+function shortenBrand(name: string): string {
+  return name
+    .replace(/Piaceri Mediterranei\s*/i, "PM ")
+    .replace(/Massimo Zero\s*/i, "MZ ")
+    .replace(/Glutiniente\s*/i, "GT ")
+    .replace(/Bauer\s*/i, "B ");
+}
+
 export default function FairPage() {
   const [fairs, setFairs] = useState<Fair[]>([]);
   const [activeFairId, setActiveFairId] = useState<string | null>(null);
@@ -365,8 +373,9 @@ export default function FairPage() {
 
         {/* Product List */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px]">
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Produkt</th>
@@ -384,7 +393,7 @@ export default function FairPage() {
                   return (
                     <tr key={product.id} className={`hover:bg-gray-50 ${remaining === 0 ? "opacity-50" : ""}`}>
                       <td className="px-4 py-3">
-                        <span className="font-medium text-gray-900 text-sm">{product.productName}</span>
+                        <span className="font-bold text-gray-900">{shortenBrand(product.productName)}</span>
                       </td>
                       <td className="px-3 py-3 text-center text-sm font-medium">{product.price} Kč</td>
                       <td className="px-3 py-3 text-center">
@@ -404,14 +413,14 @@ export default function FairPage() {
                           <button
                             onClick={() => addToCart(product)}
                             disabled={remaining <= inCart}
-                            className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             Koupit
                           </button>
                           <button
                             onClick={() => removeFromCart(product.id)}
                             disabled={inCart === 0}
-                            className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-medium hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm font-medium hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             Odebrat
                           </button>
@@ -449,6 +458,78 @@ export default function FairPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y">
+            {products.map((product) => {
+              const remaining = product.totalCount - product.soldCount;
+              const inCart = cart.get(product.id)?.quantity || 0;
+
+              return (
+                <div key={product.id} className={`p-3 ${remaining === 0 ? "opacity-50" : ""}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-base text-gray-900 leading-tight">
+                        {shortenBrand(product.productName)}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-sm font-medium text-gray-600">{product.price} Kč</span>
+                        <span className={`text-sm font-medium ${remaining === 0 ? "text-red-600" : remaining <= 3 ? "text-orange-600" : "text-gray-500"}`}>
+                          {remaining}/{product.totalCount} ks
+                        </span>
+                        {inCart > 0 && (
+                          <span className="bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded text-sm">
+                            🛒 {inCart}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      <button
+                        onClick={() => setProductModal({
+                          open: true,
+                          editId: product.id,
+                          productName: product.productName,
+                          price: String(product.price),
+                          totalCount: String(product.totalCount),
+                        })}
+                        className="text-gray-400 p-1"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteProduct(product.id)}
+                        className="text-gray-400 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => addToCart(product)}
+                      disabled={remaining <= inCart}
+                      className="flex-1 bg-green-600 text-white py-3 rounded-lg text-base font-bold hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed active:bg-green-800"
+                    >
+                      Koupit
+                    </button>
+                    <button
+                      onClick={() => removeFromCart(product.id)}
+                      disabled={inCart === 0}
+                      className="bg-gray-200 text-gray-700 px-4 py-3 rounded-lg text-base font-medium hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Odebrat
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {products.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-500">
+                Žádné produkty. Přidejte produkt pomocí tlačítka výše.
+              </div>
+            )}
           </div>
         </div>
 
