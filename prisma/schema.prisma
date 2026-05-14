@@ -87,3 +87,45 @@ model Task {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
+
+model Fair {
+  id           String            @id @default(cuid())
+  name         String
+  active       Boolean           @default(true)
+  products     FairProduct[]
+  transactions FairTransaction[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model FairProduct {
+  id              String                @id @default(cuid())
+  fairId          String
+  productName     String
+  price           Float
+  totalCount      Int
+  soldCount       Int                   @default(0)
+  fair            Fair                  @relation(fields: [fairId], references: [id], onDelete: Cascade)
+  transactionItems FairTransactionItem[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+}
+
+model FairTransaction {
+  id         String                @id @default(cuid())
+  fairId     String
+  totalPrice Float
+  items      FairTransactionItem[]
+  fair       Fair                  @relation(fields: [fairId], references: [id], onDelete: Cascade)
+  createdAt  DateTime              @default(now())
+}
+
+model FairTransactionItem {
+  id            String          @id @default(cuid())
+  transactionId String
+  fairProductId String
+  quantity      Int
+  unitPrice     Float
+  transaction   FairTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  fairProduct   FairProduct     @relation(fields: [fairProductId], references: [id], onDelete: Cascade)
+}
