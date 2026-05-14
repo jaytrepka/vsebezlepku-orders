@@ -53,7 +53,8 @@ function shortenBrand(name: string): string {
     .replace(/Piaceri Mediterranei\s*/i, "PM ")
     .replace(/Massimo Zero\s*/i, "MZ ")
     .replace(/Glutiniente\s*/i, "GT ")
-    .replace(/Bauer\s*/i, "B ");
+    .replace(/Bauer\s*/i, "B ")
+    .replace(/bezlepkov[áéý]\s*/gi, "");
 }
 
 export default function FairPage() {
@@ -269,7 +270,7 @@ export default function FairPage() {
     const bRemaining = b.totalCount - b.soldCount;
     if (aRemaining === 0 && bRemaining > 0) return 1;
     if (bRemaining === 0 && aRemaining > 0) return -1;
-    return 0;
+    return a.productName.localeCompare(b.productName, "cs");
   });
   const transactions = fairData?.transactions || [];
 
