@@ -64,6 +64,7 @@ function coreProductName(name: string): string {
 export default function LabelsPage() {
   const [products, setProducts] = useState<StockProduct[]>([]);
   const [labels, setLabels] = useState<Map<string, ProductLabel>>(new Map());
+  const [allLabels, setAllLabels] = useState<ProductLabel[]>([]);
   const [selected, setSelected] = useState<Map<string, number>>(new Map());
   const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk">("cs");
   const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
@@ -109,6 +110,7 @@ export default function LabelsPage() {
     try {
       const res = await fetch(`/api/labels?language=${labelLanguage}`);
       const data = await res.json();
+      setAllLabels(data);
       const map = new Map<string, ProductLabel>();
       for (const label of data) {
         map.set(label.productName.toLowerCase(), label);
@@ -124,12 +126,22 @@ export default function LabelsPage() {
   }
 
   function getLabelForProduct(productName: string): ProductLabel | null {
-    return labels.get(productName.toLowerCase())
+    // Fast map lookup
+    const found = labels.get(productName.toLowerCase())
       || labels.get(normalizeProductName(productName).toLowerCase())
       || labels.get(stripBrandPrefix(productName).toLowerCase())
       || labels.get(coreProductName(productName))
-      || labels.get(coreProductName(stripBrandPrefix(productName)))
-      || null;
+      || labels.get(coreProductName(stripBrandPrefix(productName)));
+    if (found) return found;
+
+    // Fallback: check if any label's core name matches or starts with stock core name
+    const stockCore = coreProductName(stripBrandPrefix(productName));
+    for (const label of allLabels) {
+      const labelCore = coreProductName(stripBrandPrefix(label.productName));
+      if (labelCore === stockCore) return label;
+      if (labelCore.startsWith(stockCore) || stockCore.startsWith(labelCore)) return label;
+    }
+    return null;
   }
 
   function toggleProduct(productName: string) {
