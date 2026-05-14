@@ -22,10 +22,14 @@ export async function POST(request: NextRequest) {
     const labelMap = new Map<string, typeof allLabels[0]>();
     for (const label of allLabels) {
       labelMap.set(label.productName, label);
+      labelMap.set(label.productName.toLowerCase(), label);
       const stripped = stripBrandPrefix(label.productName);
-      if (stripped !== label.productName && !labelMap.has(stripped)) {
+      if (stripped !== label.productName) {
         labelMap.set(stripped, label);
+        labelMap.set(stripped.toLowerCase(), label);
       }
+      labelMap.set(coreProductName(label.productName), label);
+      labelMap.set(coreProductName(stripBrandPrefix(label.productName)), label);
     }
 
     // If not Czech, also load Czech labels for cross-reference
@@ -49,8 +53,27 @@ export async function POST(request: NextRequest) {
       if (!productName || !quantity || quantity <= 0) continue;
 
       let label = labelMap.get(productName)
+        || labelMap.get(productName.toLowerCase())
         || labelMap.get(normalizeProductName(productName))
-        || labelMap.get(stripBrandPrefix(productName));
+        || labelMap.get(normalizeProductName(productName).toLowerCase())
+        || labelMap.get(stripBrandPrefix(productName))
+        || labelMap.get(stripBrandPrefix(productName).toLowerCase())
+        || labelMap.get(coreProductName(productName))
+        || labelMap.get(coreProductName(stripBrandPrefix(productName)));
+
+      // Fallback: iterate all labels and compare core names
+      if (!label) {
+        const stockCore = coreProductName(stripBrandPrefix(productName));
+        for (const l of allLabels) {
+          const labelCore = coreProductName(stripBrandPrefix(l.productName));
+          if (labelCore === stockCore || labelCore.startsWith(stockCore) || stockCore.startsWith(labelCore)) {
+            if (l.language === language) {
+              label = l;
+              break;
+            }
+          }
+        }
+      }
 
       // For non-Czech: try matching via Czech label name
       if (!label && czLabelMap) {
@@ -113,4 +136,9 @@ function stripBrandPrefix(name: string): string {
     .replace(/bezlepkov[áéý]\s*/i, "")
     .replace(/bezlepkové\s*/i, "")
     .trim();
+}
+
+function coreProductName(name: string): string {
+  const match = name.match(/^(.+?\d+\s*g\)?)/i);
+  return match ? match[1].trim().toLowerCase() : name.trim().toLowerCase();
 }
