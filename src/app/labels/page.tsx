@@ -55,6 +55,12 @@ function stripBrandPrefix(name: string): string {
     .trim();
 }
 
+// Extract core name up to weight (e.g. "DUNE DARK (33g)  extra text" → truncated at weight)
+function coreProductName(name: string): string {
+  const match = name.match(/^(.+?\d+\s*g\)?)/i);
+  return match ? match[1].trim().toLowerCase() : name.trim().toLowerCase();
+}
+
 export default function LabelsPage() {
   const [products, setProducts] = useState<StockProduct[]>([]);
   const [labels, setLabels] = useState<Map<string, ProductLabel>>(new Map());
@@ -108,6 +114,8 @@ export default function LabelsPage() {
         map.set(label.productName.toLowerCase(), label);
         map.set(stripBrandPrefix(label.productName).toLowerCase(), label);
         map.set(normalizeProductName(label.productName).toLowerCase(), label);
+        map.set(coreProductName(label.productName), label);
+        map.set(coreProductName(stripBrandPrefix(label.productName)), label);
       }
       setLabels(map);
     } catch {
@@ -119,6 +127,8 @@ export default function LabelsPage() {
     return labels.get(productName.toLowerCase())
       || labels.get(normalizeProductName(productName).toLowerCase())
       || labels.get(stripBrandPrefix(productName).toLowerCase())
+      || labels.get(coreProductName(productName))
+      || labels.get(coreProductName(stripBrandPrefix(productName)))
       || null;
   }
 
