@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ShoppingBag, Plus, Pencil, Trash2, ShoppingCart, X, BarChart3 } from "lucide-react";
+import { ShoppingBag, Plus, Pencil, Trash2, ShoppingCart, X, BarChart3, Download } from "lucide-react";
 
 interface FairProduct {
   id: string;
@@ -320,6 +320,14 @@ export default function FairPage() {
               >
                 <Plus className="w-4 h-4" /> Nový veletrh
               </button>
+              {activeFairId && (
+                <button
+                  onClick={() => window.open(`/api/fair/export?id=${activeFairId}`, "_blank")}
+                  className="bg-gray-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-gray-700 flex items-center gap-1"
+                >
+                  <Download className="w-4 h-4" /> Export PDF
+                </button>
+              )}
             </div>
           </div>
         </div>
