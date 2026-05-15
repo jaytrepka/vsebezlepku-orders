@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       const fair = await prisma.fair.findUnique({
         where: { id: fairId },
         include: {
-          products: { orderBy: { createdAt: "asc" } },
+          products: { orderBy: { sortOrder: "asc" } },
           transactions: {
             include: { items: true },
             orderBy: { createdAt: "desc" },
@@ -47,12 +47,18 @@ export async function POST(request: NextRequest) {
 
     // Add product to fair
     if (data.action === "add-product") {
+      // Set sortOrder to be after existing products
+      const maxOrder = await prisma.fairProduct.aggregate({
+        where: { fairId: data.fairId },
+        _max: { sortOrder: true },
+      });
       const product = await prisma.fairProduct.create({
         data: {
           fairId: data.fairId,
           productName: data.productName,
           price: data.price,
           totalCount: data.totalCount,
+          sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
         },
       });
       return NextResponse.json(product);
@@ -92,6 +98,18 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(transaction);
+    }
+
+    // Reorder products
+    if (data.action === "reorder") {
+      const { orders } = data; // [{id, sortOrder}]
+      for (const item of orders) {
+        await prisma.fairProduct.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        });
+      }
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

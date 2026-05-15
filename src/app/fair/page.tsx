@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { ShoppingBag, Plus, Pencil, Trash2, ShoppingCart, X, BarChart3, Download } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { ShoppingBag, Plus, Pencil, Trash2, ShoppingCart, X, BarChart3, Download, GripVertical } from "lucide-react";
 
 interface FairProduct {
   id: string;
@@ -10,6 +10,7 @@ interface FairProduct {
   price: number;
   totalCount: number;
   soldCount: number;
+  sortOrder: number;
 }
 
 interface FairTransaction {
@@ -260,17 +261,58 @@ export default function FairPage() {
     }
   }
 
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleDrop = useCallback(async (targetId: string) => {
+    if (!draggedId || draggedId === targetId || !fairData) return;
+
+    // Only reorder among non-sold-out products
+    const available = [...(fairData.products || [])]
+      .filter(p => p.totalCount - p.soldCount > 0)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    const dragIndex = available.findIndex(p => p.id === draggedId);
+    const dropIndex = available.findIndex(p => p.id === targetId);
+    if (dragIndex === -1 || dropIndex === -1) return;
+
+    const reordered = [...available];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    // Optimistic update
+    const updatedProducts = (fairData.products || []).map(p => {
+      const newIdx = reordered.findIndex(r => r.id === p.id);
+      return newIdx !== -1 ? { ...p, sortOrder: newIdx } : p;
+    });
+    setFairData({ ...fairData, products: updatedProducts });
+    setDraggedId(null);
+
+    // Persist
+    const orders = reordered.map((p, i) => ({ id: p.id, sortOrder: i }));
+    await fetch("/api/fair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reorder", orders }),
+    });
+  }, [draggedId, fairData]);
+
   const cartTotal = Array.from(cart.values()).reduce(
     (sum, item) => sum + item.quantity * item.unitPrice, 0
   );
   const cartCount = Array.from(cart.values()).reduce((sum, item) => sum + item.quantity, 0);
 
+  // Sort: sold-out at bottom, otherwise by sortOrder from DB
   const products = [...(fairData?.products || [])].sort((a, b) => {
     const aRemaining = a.totalCount - a.soldCount;
     const bRemaining = b.totalCount - b.soldCount;
     if (aRemaining === 0 && bRemaining > 0) return 1;
     if (bRemaining === 0 && aRemaining > 0) return -1;
-    return shortenBrand(a.productName).localeCompare(shortenBrand(b.productName), "cs");
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
   });
   const transactions = fairData?.transactions || [];
 
@@ -393,23 +435,38 @@ export default function FairPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Produkt</th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-20">Cena</th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-24">Zbývá</th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-20">V košíku</th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-48">Akce</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {products.map((product) => {
-                  const remaining = product.totalCount - product.soldCount;
-                  const inCart = cart.get(product.id)?.quantity || 0;
+                 <th className="w-8"></th>
+                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Produkt</th>
+                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-20">Cena</th>
+                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-24">Zbývá</th>
+                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-20">V košíku</th>
+                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 w-48">Akce</th>
+               </tr>
+             </thead>
+             <tbody className="divide-y">
+               {products.map((product) => {
+                 const remaining = product.totalCount - product.soldCount;
+                 const inCart = cart.get(product.id)?.quantity || 0;
+                 const isSoldOut = remaining === 0;
 
-                  return (
-                    <tr key={product.id} className={`hover:bg-gray-50 ${remaining === 0 ? "opacity-50" : ""}`}>
-                      <td className="px-4 py-3">
-                        <span className="font-bold text-gray-900">{shortenBrand(product.productName)}</span>
-                      </td>
+                 return (
+                   <tr
+                     key={product.id}
+                     className={`hover:bg-gray-50 ${isSoldOut ? "opacity-50" : ""} ${draggedId === product.id ? "opacity-30" : ""}`}
+                     draggable={!isSoldOut}
+                     onDragStart={() => setDraggedId(product.id)}
+                     onDragEnd={() => setDraggedId(null)}
+                     onDragOver={handleDragOver}
+                     onDrop={() => handleDrop(product.id)}
+                   >
+                     <td className="pl-2 py-3">
+                       {!isSoldOut && (
+                         <GripVertical className="w-4 h-4 text-gray-300 cursor-grab active:cursor-grabbing" />
+                       )}
+                     </td>
+                     <td className="px-4 py-3">
+                       <span className="font-bold text-gray-900">{shortenBrand(product.productName)}</span>
+                     </td>
                       <td className="px-3 py-3 text-center text-sm font-medium">{product.price} Kč</td>
                       <td className="px-3 py-3 text-center">
                         <span className={`text-sm font-medium ${remaining === 0 ? "text-red-600" : remaining <= 3 ? "text-orange-600" : "text-gray-700"}`}>
@@ -466,7 +523,7 @@ export default function FairPage() {
                 })}
                 {products.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                       Žádné produkty. Přidejte produkt pomocí tlačítka výše.
                     </td>
                   </tr>
