@@ -306,13 +306,15 @@ export default function FairPage() {
   );
   const cartCount = Array.from(cart.values()).reduce((sum, item) => sum + item.quantity, 0);
 
-  // Sort: sold-out at bottom, otherwise by sortOrder from DB
+  // Sort: sold-out at bottom, then by sortOrder (alphabetical fallback when equal)
   const products = [...(fairData?.products || [])].sort((a, b) => {
     const aRemaining = a.totalCount - a.soldCount;
     const bRemaining = b.totalCount - b.soldCount;
     if (aRemaining === 0 && bRemaining > 0) return 1;
     if (bRemaining === 0 && aRemaining > 0) return -1;
-    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    const orderDiff = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    if (orderDiff !== 0) return orderDiff;
+    return shortenBrand(a.productName).localeCompare(shortenBrand(b.productName), "cs");
   });
   const transactions = fairData?.transactions || [];
 
