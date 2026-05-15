@@ -47,12 +47,10 @@ export async function GET(request: NextRequest) {
     const PAGE_HEIGHT = 842;
     const MARGIN = 40;
     const ROW_HEIGHT = 22;
-    const HEADER_HEIGHT = 60;
 
     const colName = MARGIN;
     const colCount = 370;
     const colPrice = 440;
-    const colTotal = 510;
 
     let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     let y = PAGE_HEIGHT - MARGIN;
@@ -67,17 +65,6 @@ export async function GET(request: NextRequest) {
     });
     y -= 30;
 
-    // Date
-    const dateStr = new Date(fair.createdAt).toLocaleDateString("cs-CZ");
-    page.drawText(`Datum: ${dateStr}`, {
-      x: MARGIN,
-      y,
-      size: 10,
-      font: regularFont,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-    y -= HEADER_HEIGHT - 30;
-
     // Table header
     function drawHeader(p: typeof page, yPos: number) {
       p.drawRectangle({
@@ -90,13 +77,11 @@ export async function GET(request: NextRequest) {
       p.drawText("Produkt", { x: colName, y: yPos, size: 9, font: boldFont, color: rgb(0, 0, 0) });
       p.drawText("Ks", { x: colCount, y: yPos, size: 9, font: boldFont, color: rgb(0, 0, 0) });
       p.drawText("Cena/ks", { x: colPrice, y: yPos, size: 9, font: boldFont, color: rgb(0, 0, 0) });
-      p.drawText("Celkem", { x: colTotal, y: yPos, size: 9, font: boldFont, color: rgb(0, 0, 0) });
       return yPos - ROW_HEIGHT - 5;
     }
 
     y = drawHeader(page, y);
 
-    let grandTotal = 0;
     let totalItems = 0;
 
     for (const product of fair.products) {
@@ -106,8 +91,6 @@ export async function GET(request: NextRequest) {
         y = drawHeader(page, y);
       }
 
-      const totalPrice = product.totalCount * product.price;
-      grandTotal += totalPrice;
       totalItems += product.totalCount;
 
       // Truncate long names
@@ -139,13 +122,6 @@ export async function GET(request: NextRequest) {
         font: regularFont,
         color: rgb(0, 0, 0),
       });
-      page.drawText(`${totalPrice} Kč`, {
-        x: colTotal,
-        y,
-        size: 9,
-        font: boldFont,
-        color: rgb(0, 0, 0),
-      });
 
       y -= ROW_HEIGHT;
     }
@@ -166,7 +142,6 @@ export async function GET(request: NextRequest) {
     });
     page.drawText("CELKEM", { x: colName, y, size: 10, font: boldFont, color: rgb(0, 0, 0) });
     page.drawText(String(totalItems), { x: colCount, y, size: 10, font: boldFont, color: rgb(0, 0, 0) });
-    page.drawText(`${grandTotal} Kč`, { x: colTotal, y, size: 10, font: boldFont, color: rgb(0, 0, 0) });
 
     const pdfBytes = await pdfDoc.save();
 
