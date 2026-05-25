@@ -144,7 +144,6 @@
         var processedCodes = new Set();
         var lastY = -1;
         var unchangedScrollCount = 0;
-        var totalChecked = 0;
 
         while (isRunning) {
           var rows = document.querySelectorAll("tr[data-cy], tr.msts_hk");
@@ -162,7 +161,6 @@
               var cleanedKod = clean(rawKod);
 
               if (!row.dataset.logged) {
-                totalChecked++;
                 row.dataset.logged = "true";
               }
 
