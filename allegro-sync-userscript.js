@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Allegro Sync - Ultimate (v5.1)
+// @name         Allegro Sync - Ultimate (v5.2)
 // @namespace    http://tampermonkey.net/
-// @version      5.1
+// @version      5.2
 // @match        https://salescenter.allegro.com/my-assortment*
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
@@ -123,7 +123,7 @@
 
     console.clear();
     console.log(
-      "%c--- START SYNCHRONIZACE v5.1 ---",
+      "%c--- START SYNCHRONIZACE v5.2 ---",
       "color: orange; font-weight: bold; font-size: 14px;",
     );
 
@@ -136,7 +136,7 @@
         sheetData.forEach(function (item) {
           itemsMap.set(clean(item.kod), {
             original: item.kod,
-            nazev: item.nazev || item.name || "",
+            nazev: item["Název"] || item.nazev || item.name || "",
             pocet: item.pocet,
           });
         });
@@ -240,7 +240,13 @@
           );
           notFound.forEach(function (item) {
             console.log(
-              "%c📦 " + item.original + " | " + item.nazev + " | " + item.pocet + " ks",
+              "%c📦 " +
+                item.original +
+                " | " +
+                item.nazev +
+                " | " +
+                item.pocet +
+                " ks",
               "color: #e67e22; font-weight: bold;",
             );
           });
@@ -259,7 +265,9 @@
             processedCodes.size +
             "/" +
             itemsMap.size +
-            (notFound.length > 0 ? "\nNenalezeno (≥4ks): " + notFound.length : ""),
+            (notFound.length > 0
+              ? "\nNenalezeno (≥4ks): " + notFound.length
+              : ""),
         );
       },
     });
@@ -268,7 +276,7 @@
   // UI Tlačítka
   var btn = document.createElement("button");
   btn.id = "allegro-sync-btn";
-  btn.innerHTML = "🚀 Sync Allegro (v5.1)";
+  btn.innerHTML = "🚀 Sync Allegro (v5.2)";
   btn.style =
     "position:fixed; bottom:20px; right:20px; z-index:99999; padding:15px; background:#e67e22; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;";
   btn.onclick = processOffers;
