@@ -661,7 +661,7 @@ export default function Home() {
                       className="rounded w-5 h-5 cursor-pointer"
                     />
                   </td>
-                  <td className="px-4 py-3 font-mono text-sm">
+                  <td className="px-4 py-3 font-mono text-sm cursor-pointer select-none" onClick={() => toggleOrder(order.id)}>
                     {order.orderNumber}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
@@ -686,24 +686,26 @@ export default function Home() {
                           </button>
                         </div>
                       )}
-                      {order.items.map((item) => (
+                      {selectedOrders.includes(order.id) && order.items.map((item) => (
                         <div
                           key={item.id}
                           className={`flex items-center gap-2 text-sm ${
                             excludedItems.includes(item.id) ? "opacity-50" : ""
                           }`}
                         >
-                          {selectedOrders.includes(order.id) && (
-                            <input
-                              type="checkbox"
-                              checked={!excludedItems.includes(item.id)}
-                              onChange={() => toggleItem(item.id)}
-                              className="rounded w-5 h-5 min-w-5 cursor-pointer"
-                              title="Zahrnout do tisku"
-                            />
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={!excludedItems.includes(item.id)}
+                            onChange={() => toggleItem(item.id)}
+                            className="rounded w-5 h-5 min-w-5 cursor-pointer"
+                            title="Zahrnout do tisku"
+                          />
                           <span className="font-medium whitespace-nowrap">{item.quantity}×</span>
-                          <span className="break-words" title={item.productName}>
+                          <span
+                            className="break-words cursor-pointer hover:text-blue-600"
+                            title={item.productName}
+                            onClick={() => toggleItem(item.id)}
+                          >
                             {shortenProductName(item.productName)}
                           </span>
                           {(() => {
@@ -786,6 +788,11 @@ export default function Home() {
                           })()}
                         </div>
                       ))}
+                      {!selectedOrders.includes(order.id) && (
+                        <span className="text-sm text-gray-500">
+                         {order.items.length} {order.items.length === 1 ? "produkt" : order.items.length < 5 ? "produkty" : "produktů"}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">{order.totalPrice || "-"}</td>
