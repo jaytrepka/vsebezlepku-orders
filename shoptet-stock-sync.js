@@ -21,6 +21,7 @@
     const SYNC_KEY = 'vbl-sync-active';
     const SYNC_COUNT_KEY = 'vbl-sync-count';
     const SYNC_PAGE_KEY = 'vbl-sync-page';
+    const SYNC_NAMES_KEY = 'vbl-sync-names';
 
     console.log("VšeBezLepku Expirace: Script v2.0 spuštěn.");
 
@@ -84,6 +85,11 @@
         const prevCount = parseInt(sessionStorage.getItem(SYNC_COUNT_KEY) || '0', 10);
         updateButtonStatus(`Stránka ${page}: odesílám ${batchData.length} produktů...`, true);
 
+        // Accumulate synced product names across pages
+        const prevNames = JSON.parse(sessionStorage.getItem(SYNC_NAMES_KEY) || '[]');
+        const currentNames = batchData.map(item => item.name);
+        sessionStorage.setItem(SYNC_NAMES_KEY, JSON.stringify([...prevNames, ...currentNames]));
+
         sendBatchToApp(batchData, rowsMap, () => {
             const newTotal = prevCount + batchData.length;
             sessionStorage.setItem(SYNC_COUNT_KEY, String(newTotal));
@@ -106,13 +112,40 @@
                 nextLink.click();
             }, 500);
         } else {
-            // Last page — done!
-            sessionStorage.removeItem(SYNC_KEY);
-            sessionStorage.removeItem(SYNC_PAGE_KEY);
-            sessionStorage.removeItem(SYNC_COUNT_KEY);
-            updateButtonStatus(`✅ Hotovo! Synchronizováno ${totalSynced} produktů`, false);
-            setTimeout(() => updateButtonStatus("🔄 Sync trvanlivosti (všechny stránky)", false), 4000);
+            // Last page — cleanup stale products then finish
+            const allNames = JSON.parse(sessionStorage.getItem(SYNC_NAMES_KEY) || '[]');
+            cleanupStaleProducts(allNames, () => {
+                sessionStorage.removeItem(SYNC_KEY);
+                sessionStorage.removeItem(SYNC_PAGE_KEY);
+                sessionStorage.removeItem(SYNC_COUNT_KEY);
+                sessionStorage.removeItem(SYNC_NAMES_KEY);
+                updateButtonStatus(`✅ Hotovo! Synchronizováno ${totalSynced} produktů`, false);
+                setTimeout(() => updateButtonStatus("🔄 Sync trvanlivosti (všechny stránky)", false), 4000);
+            });
         }
+    }
+
+    function cleanupStaleProducts(syncedNames, onDone) {
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: `${APP_URL}/api/stock/cleanup-stale`,
+            data: JSON.stringify({ syncedProductNames: syncedNames }),
+            headers: { "Content-Type": "application/json" },
+            timeout: 30000,
+            onload: function(response) {
+                if (response.status === 200) {
+                    const result = JSON.parse(response.responseText);
+                    if (result.zeroed > 0) {
+                        console.log(`VšeBezLepku: Vyčištěno ${result.zeroed} produktů, které nejsou na Shoptetu.`);
+                    }
+                }
+                onDone();
+            },
+            onerror: function() {
+                console.error("VšeBezLepku: Chyba při čištění starých produktů");
+                onDone();
+            }
+        });
     }
 
     function sendBatchToApp(batchData, rowsMap, onSuccess, onError) {
@@ -239,6 +272,7 @@
             sessionStorage.setItem(SYNC_KEY, 'true');
             sessionStorage.setItem(SYNC_COUNT_KEY, '0');
             sessionStorage.setItem(SYNC_PAGE_KEY, '1');
+            sessionStorage.setItem(SYNC_NAMES_KEY, '[]');
             processCurrentPage(false);
         };
         document.body.appendChild(btn);
