@@ -98,6 +98,24 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// DELETE - Delete a label by ID
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Label ID required" }, { status: 400 });
+    }
+
+    await prisma.productLabel.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Label delete error:", error);
+    return NextResponse.json({ error: "Failed to delete label" }, { status: 500 });
+  }
+}
+
 // PATCH - Update verified status or hasFactoryLabel for a label
 export async function PATCH(request: NextRequest) {
   try {

@@ -108,11 +108,17 @@ export default function Home() {
     return null;
   }
 
-  // Calculate total items to print (from selected orders, excluding unchecked items and items without labels in selected language)
+  // Calculate total items to print (from selected orders, excluding unchecked items, factory labels, and items without labels)
   const itemsToPrint = orders
     .filter((o) => selectedOrders.includes(o.id))
     .flatMap((o) => o.items)
-    .filter((item) => !excludedItems.includes(item.id) && getLabelForProduct(item))
+    .filter((item) => {
+      if (excludedItems.includes(item.id)) return false;
+      const label = getLabelForProduct(item);
+      if (!label || label.hasFactoryLabel) return false;
+      if (item.label?.hasFactoryLabel) return false;
+      return true;
+    })
     .reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
@@ -165,6 +171,42 @@ export default function Home() {
       }
     } catch {
       setMessage({ type: "error", text: "Chyba při aktualizaci štítku" });
+    }
+  }
+
+  async function markAsLabeled(productName: string) {
+    try {
+      const res = await fetch("/api/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName,
+          language: labelLanguage,
+          nazev: "-",
+          slozeni: "-",
+          nutricniHodnoty: "-",
+          vyrobce: "-",
+          hasFactoryLabel: true,
+        }),
+      });
+      if (res.ok) {
+        fetchOrders();
+        if (labelLanguage !== "cs") fetchLanguageLabels();
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při označování štítku" });
+    }
+  }
+
+  async function unmarkAsLabeled(label: ProductLabel) {
+    try {
+      const res = await fetch(`/api/labels?id=${label.id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchOrders();
+        if (labelLanguage !== "cs") fetchLanguageLabels();
+      }
+    } catch {
+      setMessage({ type: "error", text: "Chyba při odznačování štítku" });
     }
   }
 
@@ -713,12 +755,29 @@ export default function Home() {
                             const hasCzechLabel = !!item.label;
                             const currentLabel = labelLanguage === "cs" ? item.label : langLabel;
                             
-                            // Check if product has factory label
-                            if (currentLabel?.hasFactoryLabel) {
+                            // Check if CS label has factory label (applies to all languages)
+                            if (item.label?.hasFactoryLabel) {
                               return (
                                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
                                   Produkt má štítek z výroby
                                 </span>
+                              );
+                            }
+
+                            // Check if non-CS label is marked as "has label" (user-marked)
+                            if (labelLanguage !== "cs" && currentLabel?.hasFactoryLabel) {
+                              return (
+                                <>
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                    Má štítek ✓
+                                  </span>
+                                  <button
+                                    onClick={() => unmarkAsLabeled(currentLabel)}
+                                    className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded hover:bg-red-100 hover:text-red-700 cursor-pointer"
+                                  >
+                                    Zrušit
+                                  </button>
+                                </>
                               );
                             }
                             
@@ -776,13 +835,21 @@ export default function Home() {
                                   </button>
                                 </>
                               ) : (
-                                <button
-                                  onClick={() => openLabelModal(item.label?.productName || item.productName, null, item.productUrl, labelLanguage)}
-                                  className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  Přidat {labelLanguage.toUpperCase()}
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => openLabelModal(item.label?.productName || item.productName, null, item.productUrl, labelLanguage)}
+                                    className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Přidat {labelLanguage.toUpperCase()}
+                                  </button>
+                                  <button
+                                    onClick={() => markAsLabeled(item.label?.productName || item.productName)}
+                                    className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded hover:bg-blue-100 cursor-pointer"
+                                  >
+                                    Má štítek
+                                  </button>
+                                </>
                               );
                             }
                           })()}
