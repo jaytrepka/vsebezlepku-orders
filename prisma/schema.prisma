@@ -143,6 +143,7 @@ model Shelf {
 model ShelfBox {
   id             String    @id @default(cuid())
   shelfId        String
+  floor          Int       @default(0)
   row            Int       @default(0)
   column         Int       @default(0)
   productName    String

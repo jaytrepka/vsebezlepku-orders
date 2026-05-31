@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowRight, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Search, Layers } from "lucide-react";
 
 interface ShelfBox {
   id: string;
   shelfId: string;
+  floor: number;
   row: number;
   column: number;
   productName: string;
@@ -43,8 +44,10 @@ export default function WarehousePage() {
     open: boolean;
     shelfId: string;
     editId?: string;
+    floor: number;
     row: number;
     column: number;
+    action?: "insertColumn" | "insertRow";
     productName: string;
     pieces: string;
     expirationDate: string;
@@ -138,7 +141,7 @@ export default function WarehousePage() {
 
   async function saveBox() {
     if (!boxModal) return;
-    const { editId, shelfId, row, column, productName, pieces, expirationDate } = boxModal;
+    const { editId, shelfId, floor, row, column, action, productName, pieces, expirationDate } = boxModal;
     if (!productName.trim() || !pieces) return;
 
     try {
@@ -151,8 +154,6 @@ export default function WarehousePage() {
             productName,
             pieces: parseInt(pieces),
             expirationDate: expirationDate || null,
-            row,
-            column,
           }),
         });
       } else {
@@ -160,7 +161,9 @@ export default function WarehousePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            action: action || undefined,
             shelfId,
+            floor,
             row,
             column,
             productName,
@@ -189,20 +192,20 @@ export default function WarehousePage() {
     }
   }
 
-  // Get next available position for a new box on a shelf
-  function getNextPosition(shelf: Shelf): { row: number; column: number; direction: "up" | "right" } {
-    if (shelf.boxes.length === 0) return { row: 0, column: 0, direction: "right" };
-    const maxRow = Math.max(...shelf.boxes.map((b) => b.row));
-    const maxCol = Math.max(...shelf.boxes.map((b) => b.column));
-    return { row: maxRow, column: maxCol, direction: "right" };
-  }
-
-  function addBoxToShelf(shelfId: string, row: number, column: number) {
+  function openBoxModal(params: {
+    shelfId: string;
+    floor: number;
+    row: number;
+    column: number;
+    action?: "insertColumn" | "insertRow";
+  }) {
     setBoxModal({
       open: true,
-      shelfId,
-      row,
-      column,
+      shelfId: params.shelfId,
+      floor: params.floor,
+      row: params.row,
+      column: params.column,
+      action: params.action,
       productName: "",
       pieces: "",
       expirationDate: "",
@@ -223,27 +226,29 @@ export default function WarehousePage() {
     return new Date(date).toLocaleDateString("cs-CZ", { month: "short", year: "numeric" });
   }
 
-  // Build grid representation of boxes on a shelf
-  function buildGrid(boxes: ShelfBox[]): { rows: number; cols: number; grid: (ShelfBox | null)[][] } {
-    if (boxes.length === 0) return { rows: 1, cols: 1, grid: [[null]] };
-    const maxRow = Math.max(...boxes.map((b) => b.row));
-    const maxCol = Math.max(...boxes.map((b) => b.column));
-    const rows = maxRow + 1;
-    const cols = maxCol + 1;
-    const grid: (ShelfBox | null)[][] = Array.from({ length: rows }, () =>
-      Array.from({ length: cols }, () => null)
-    );
-    for (const box of boxes) {
-      grid[box.row][box.column] = box;
-    }
-    return { rows, cols, grid };
+  // Get floors for a shelf
+  function getFloors(shelf: Shelf): number[] {
+    if (shelf.boxes.length === 0) return [0];
+    const floors = [...new Set(shelf.boxes.map((b) => b.floor))].sort((a, b) => a - b);
+    return floors.length > 0 ? floors : [0];
+  }
+
+  // Get columns on a floor (sorted)
+  function getColumns(boxes: ShelfBox[], floor: number): number[] {
+    const cols = [...new Set(boxes.filter((b) => b.floor === floor).map((b) => b.column))].sort((a, b) => a - b);
+    return cols;
+  }
+
+  // Get boxes in a column stack (sorted by row, bottom=0 first)
+  function getColumnStack(boxes: ShelfBox[], floor: number, column: number): ShelfBox[] {
+    return boxes.filter((b) => b.floor === floor && b.column === column).sort((a, b) => a.row - b.row);
   }
 
   const filteredProducts = stockProducts.filter((p) =>
     p.productName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Find feature: compute matching boxes and their locations
+  // Find feature
   const findResults = activeFind
     ? shelves
         .flatMap((shelf) =>
@@ -252,6 +257,7 @@ export default function WarehousePage() {
             .map((box) => ({
               shelfName: shelf.name,
               priority: shelf.priority,
+              floor: box.floor + 1,
               column: box.column + 1,
               row: box.row + 1,
               pieces: box.pieces,
@@ -269,8 +275,8 @@ export default function WarehousePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-stone-100 p-4 sm:p-6">
-      {/* Header */}
       <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Package className="w-7 h-7 text-amber-700" />
@@ -320,7 +326,6 @@ export default function WarehousePage() {
             )}
           </div>
 
-          {/* Search results */}
           {activeFind && (
             <div className="mt-3 bg-white border border-amber-200 rounded-lg p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
@@ -342,7 +347,7 @@ export default function WarehousePage() {
                     <div key={i} className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-amber-800">{r.shelfName}</span>
                       <span className="text-stone-400">—</span>
-                      <span className="text-stone-600">sloupec {r.column}, řada {r.row}</span>
+                      <span className="text-stone-600">patro {r.floor}, sloupec {r.column}, řada {r.row}</span>
                       <span className="text-stone-400">·</span>
                       <span className="font-semibold text-stone-800">{r.pieces} ks</span>
                     </div>
@@ -365,7 +370,7 @@ export default function WarehousePage() {
           </div>
         )}
 
-        {/* Shelves */}
+        {/* Shelves (Bookcases) */}
         {shelves.length === 0 ? (
           <div className="text-center py-16 text-stone-500">
             <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -374,21 +379,33 @@ export default function WarehousePage() {
         ) : (
           <div className="space-y-8">
             {shelves.map((shelf) => {
-              const { rows, cols, grid } = buildGrid(shelf.boxes);
+              const floors = getFloors(shelf);
               return (
                 <div key={shelf.id} className="bg-white rounded-xl shadow-md border border-stone-200 overflow-hidden">
-                  {/* Shelf header */}
+                  {/* Bookcase header */}
                   <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-amber-100 to-amber-50 border-b border-stone-200">
                     <div className="flex items-center gap-3">
                       <span className="text-lg font-semibold text-stone-800">{shelf.name}</span>
                       <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
                         Priorita: {shelf.priority}
                       </span>
-                      <span className="text-xs text-stone-500">
-                        {shelf.boxes.length} {shelf.boxes.length === 1 ? "krabice" : shelf.boxes.length < 5 ? "krabice" : "krabic"}
+                      <span className="text-xs text-stone-500 flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        {floors.length} {floors.length === 1 ? "patro" : floors.length < 5 ? "patra" : "pater"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Add floor */}
+                      <button
+                        onClick={() => {
+                          const nextFloor = floors.length > 0 ? Math.max(...floors) + 1 : 0;
+                          openBoxModal({ shelfId: shelf.id, floor: nextFloor, row: 0, column: 0 });
+                        }}
+                        className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Patro
+                      </button>
                       <button
                         onClick={() =>
                           setShelfModal({
@@ -411,109 +428,193 @@ export default function WarehousePage() {
                     </div>
                   </div>
 
-                  {/* Shelf visual - boxes grid */}
-                  <div className="p-5">
-                    <div className="relative">
-                      {/* Shelf structure */}
-                      <div className="bg-gradient-to-t from-amber-900/10 to-transparent rounded-lg p-4 border-2 border-dashed border-amber-200">
-                        {/* Render rows from top (highest) to bottom (row 0) */}
-                        <div className="flex flex-col-reverse gap-2">
-                          {Array.from({ length: rows }, (_, rowIdx) => (
-                            <div key={rowIdx} className="flex gap-2 items-end">
-                              {Array.from({ length: cols }, (_, colIdx) => {
-                                const box = grid[rowIdx][colIdx];
-                                if (box) {
-                                  const isHighlighted = highlightedBoxIds.has(box.id);
-                                  return (
-                                    <div
-                                      key={`${rowIdx}-${colIdx}`}
-                                      className={`relative group min-w-[140px] sm:min-w-[160px] border-2 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ${
-                                        isHighlighted
-                                          ? "bg-gradient-to-b from-green-100 to-green-200 border-green-500 ring-2 ring-green-300 scale-105"
-                                          : "bg-gradient-to-b from-amber-50 to-amber-100 border-amber-300"
-                                      }`}
-                                    >
-                                      {/* Box content */}
-                                      <div className="text-xs font-semibold text-stone-800 truncate" title={box.productName}>
-                                        {shortenName(box.productName)}
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-sm font-bold text-amber-800">{box.pieces} ks</span>
-                                        {box.expirationDate && (
-                                          <span className="text-[10px] text-stone-500 bg-white px-1 rounded">
-                                            {formatExpDate(box.expirationDate)}
-                                          </span>
+                  {/* Floors - rendered from top (highest) to bottom (floor 0) */}
+                  <div className="p-4">
+                    <div className="flex flex-col gap-1">
+                      {[...floors].reverse().map((floorIdx) => {
+                        const columns = getColumns(shelf.boxes, floorIdx);
+                        return (
+                          <div key={floorIdx} className="relative">
+                            {/* Floor label */}
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-medium text-stone-400 uppercase w-14">
+                                Patro {floorIdx + 1}
+                              </span>
+                              <div className="flex-1 h-px bg-stone-200" />
+                            </div>
+
+                            {/* Floor content: columns with boxes */}
+                            <div className="ml-14 flex items-end gap-1 pb-3 overflow-x-auto">
+                              {columns.length === 0 ? (
+                                /* Empty floor - add first box */
+                                <button
+                                  onClick={() => openBoxModal({ shelfId: shelf.id, floor: floorIdx, row: 0, column: 0 })}
+                                  className="min-w-[130px] h-[60px] border-2 border-dashed border-amber-300 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-50 cursor-pointer transition-colors"
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  <span className="text-xs">Přidat krabici</span>
+                                </button>
+                              ) : (
+                                <>
+                                  {columns.map((colIdx, colPosition) => {
+                                    const stack = getColumnStack(shelf.boxes, floorIdx, colIdx);
+                                    return (
+                                      <div key={colIdx} className="flex items-end gap-1">
+                                        {/* Insert column left (only for first column) */}
+                                        {colPosition === 0 && (
+                                          <button
+                                            onClick={() =>
+                                              openBoxModal({
+                                                shelfId: shelf.id,
+                                                floor: floorIdx,
+                                                row: 0,
+                                                column: colIdx,
+                                                action: "insertColumn",
+                                              })
+                                            }
+                                            className="self-center p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                            title="Přidat sloupec vlevo"
+                                          >
+                                            <ArrowLeft className="w-3.5 h-3.5" />
+                                          </button>
                                         )}
-                                      </div>
-                                      {/* Edit/Delete overlay */}
-                                      <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
+
+                                        {/* Column stack (bottom to top) */}
+                                        <div className="flex flex-col-reverse gap-0.5">
+                                          {/* Add below bottom box */}
+                                          <button
+                                            onClick={() =>
+                                              openBoxModal({
+                                                shelfId: shelf.id,
+                                                floor: floorIdx,
+                                                row: stack[0]?.row ?? 0,
+                                                column: colIdx,
+                                                action: "insertRow",
+                                              })
+                                            }
+                                            className="mx-auto p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                            title="Přidat krabici pod"
+                                          >
+                                            <ArrowDown className="w-3 h-3" />
+                                          </button>
+
+                                          {stack.map((box, stackIdx) => (
+                                            <div key={box.id} className="flex flex-col items-center gap-0.5">
+                                              {/* The box */}
+                                              <div
+                                                className={`relative group min-w-[130px] border-2 rounded-lg p-2.5 transition-all ${
+                                                  highlightedBoxIds.has(box.id)
+                                                    ? "bg-gradient-to-b from-green-100 to-green-200 border-green-500 ring-2 ring-green-300 scale-105"
+                                                    : "bg-gradient-to-b from-amber-50 to-amber-100 border-amber-300 hover:shadow-md"
+                                                }`}
+                                              >
+                                                <div className="text-xs font-semibold text-stone-800 truncate max-w-[120px]" title={box.productName}>
+                                                  {shortenName(box.productName)}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                  <span className="text-sm font-bold text-amber-800">{box.pieces} ks</span>
+                                                  {box.expirationDate && (
+                                                    <span className="text-[10px] text-stone-500 bg-white px-1 rounded">
+                                                      {formatExpDate(box.expirationDate)}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {/* Edit/Delete */}
+                                                <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
+                                                  <button
+                                                    onClick={() =>
+                                                      setBoxModal({
+                                                        open: true,
+                                                        shelfId: box.shelfId,
+                                                        editId: box.id,
+                                                        floor: box.floor,
+                                                        row: box.row,
+                                                        column: box.column,
+                                                        productName: box.productName,
+                                                        pieces: String(box.pieces),
+                                                        expirationDate: box.expirationDate ? box.expirationDate.split("T")[0] : "",
+                                                      })
+                                                    }
+                                                    className="p-1 bg-white/80 rounded hover:bg-amber-200 cursor-pointer"
+                                                  >
+                                                    <Pencil className="w-3 h-3 text-stone-600" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => deleteBox(box.id)}
+                                                    className="p-1 bg-white/80 rounded hover:bg-red-200 cursor-pointer"
+                                                  >
+                                                    <Trash2 className="w-3 h-3 text-red-600" />
+                                                  </button>
+                                                </div>
+                                              </div>
+
+                                              {/* Add above this box (between boxes or on top) */}
+                                              {stackIdx < stack.length - 1 ? (
+                                                <button
+                                                  onClick={() =>
+                                                    openBoxModal({
+                                                      shelfId: shelf.id,
+                                                      floor: floorIdx,
+                                                      row: box.row + 1,
+                                                      column: colIdx,
+                                                      action: "insertRow",
+                                                    })
+                                                  }
+                                                  className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                                  title="Přidat krabici mezi"
+                                                >
+                                                  <Plus className="w-3 h-3" />
+                                                </button>
+                                              ) : null}
+                                            </div>
+                                          ))}
+
+                                          {/* Add above top box */}
+                                          <button
+                                            onClick={() =>
+                                              openBoxModal({
+                                                shelfId: shelf.id,
+                                                floor: floorIdx,
+                                                row: (stack[stack.length - 1]?.row ?? 0) + 1,
+                                                column: colIdx,
+                                                action: "insertRow",
+                                              })
+                                            }
+                                            className="mx-auto p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                            title="Přidat krabici nahoru"
+                                          >
+                                            <ArrowUp className="w-3 h-3" />
+                                          </button>
+                                        </div>
+
+                                        {/* Insert column right */}
                                         <button
                                           onClick={() =>
-                                            setBoxModal({
-                                              open: true,
-                                              shelfId: box.shelfId,
-                                              editId: box.id,
-                                              row: box.row,
-                                              column: box.column,
-                                              productName: box.productName,
-                                              pieces: String(box.pieces),
-                                              expirationDate: box.expirationDate
-                                                ? box.expirationDate.split("T")[0]
-                                                : "",
+                                            openBoxModal({
+                                              shelfId: shelf.id,
+                                              floor: floorIdx,
+                                              row: 0,
+                                              column: colIdx + 1,
+                                              action: "insertColumn",
                                             })
                                           }
-                                          className="p-1 bg-white/80 rounded hover:bg-amber-200 cursor-pointer"
+                                          className="self-center p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                          title="Přidat sloupec vpravo"
                                         >
-                                          <Pencil className="w-3 h-3 text-stone-600" />
-                                        </button>
-                                        <button
-                                          onClick={() => deleteBox(box.id)}
-                                          className="p-1 bg-white/80 rounded hover:bg-red-200 cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3 h-3 text-red-600" />
+                                          <ArrowRight className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <div
-                                    key={`${rowIdx}-${colIdx}`}
-                                    className="min-w-[140px] sm:min-w-[160px] h-[70px] border-2 border-dashed border-stone-200 rounded-lg"
-                                  />
-                                );
-                              })}
+                                    );
+                                  })}
+                                </>
+                              )}
                             </div>
-                          ))}
-                        </div>
 
-                        {/* Add box buttons */}
-                        <div className="flex gap-2 mt-4 pt-3 border-t border-amber-200">
-                          <button
-                            onClick={() => {
-                              // Add to the right of bottom row
-                              const bottomRowBoxes = shelf.boxes.filter((b) => b.row === 0);
-                              const nextCol = bottomRowBoxes.length > 0 ? Math.max(...bottomRowBoxes.map((b) => b.column)) + 1 : 0;
-                              addBoxToShelf(shelf.id, 0, nextCol);
-                            }}
-                            className="flex items-center gap-1.5 text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg hover:bg-amber-200 transition-colors cursor-pointer"
-                          >
-                            <ArrowRight className="w-3.5 h-3.5" />
-                            Přidat vpravo
-                          </button>
-                          <button
-                            onClick={() => {
-                              // Add above (new row)
-                              const nextRow = shelf.boxes.length > 0 ? Math.max(...shelf.boxes.map((b) => b.row)) + 1 : 0;
-                              addBoxToShelf(shelf.id, nextRow, 0);
-                            }}
-                            className="flex items-center gap-1.5 text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg hover:bg-amber-200 transition-colors cursor-pointer"
-                          >
-                            <ArrowUp className="w-3.5 h-3.5" />
-                            Přidat nahoru
-                          </button>
-                        </div>
-                      </div>
+                            {/* Floor "shelf board" visual */}
+                            <div className="ml-14 h-2 bg-gradient-to-b from-amber-800 to-amber-900 rounded-sm shadow-sm" />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -579,7 +680,7 @@ export default function WarehousePage() {
             </h2>
             <div className="space-y-3">
               {/* Product search/select */}
-              <div ref={searchRef}>
+              <div ref={searchRef} className="relative">
                 <label className="text-sm text-stone-600">Produkt</label>
                 <input
                   type="text"
@@ -587,18 +688,14 @@ export default function WarehousePage() {
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setShowSuggestions(true);
-                    if (!boxModal.editId) {
-                      setBoxModal({ ...boxModal, productName: e.target.value });
-                    } else {
-                      setBoxModal({ ...boxModal, productName: e.target.value });
-                    }
+                    setBoxModal({ ...boxModal, productName: e.target.value });
                   }}
                   onFocus={() => setShowSuggestions(true)}
                   className="w-full border border-stone-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   placeholder="Hledat produkt..."
                 />
                 {showSuggestions && searchQuery && filteredProducts.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full max-w-[calc(100%-3rem)] bg-white border border-stone-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {filteredProducts.slice(0, 15).map((p) => (
                       <button
                         key={p.id}
@@ -633,9 +730,6 @@ export default function WarehousePage() {
                   onChange={(e) => setBoxModal({ ...boxModal, expirationDate: e.target.value })}
                   className="w-full border border-stone-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
-              </div>
-              <div className="text-xs text-stone-400">
-                Pozice: řada {boxModal.row + 1}, sloupec {boxModal.column + 1}
               </div>
             </div>
             <div className="flex gap-3 mt-5">
