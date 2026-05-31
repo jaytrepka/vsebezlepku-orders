@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Search, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowLeft, ArrowRight, Search, Layers } from "lucide-react";
 
 interface ShelfBox {
   id: string;
@@ -481,25 +481,27 @@ export default function WarehousePage() {
 
                                         {/* Column stack (bottom to top) */}
                                         <div className="flex flex-col-reverse gap-0.5">
-                                          {/* Add below bottom box */}
-                                          <button
-                                            onClick={() =>
-                                              openBoxModal({
-                                                shelfId: shelf.id,
-                                                floor: floorIdx,
-                                                row: stack[0]?.row ?? 0,
-                                                column: colIdx,
-                                                action: "insertRow",
-                                              })
-                                            }
-                                            className="mx-auto p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
-                                            title="Přidat krabici pod"
-                                          >
-                                            <ArrowDown className="w-3 h-3" />
-                                          </button>
-
                                           {stack.map((box, stackIdx) => (
                                             <div key={box.id} className="flex flex-col items-center gap-0.5">
+                                              {/* Insert between: button below this box (between this and the one below) */}
+                                              {stackIdx > 0 && (
+                                                <button
+                                                  onClick={() =>
+                                                    openBoxModal({
+                                                      shelfId: shelf.id,
+                                                      floor: floorIdx,
+                                                      row: box.row,
+                                                      column: colIdx,
+                                                      action: "insertRow",
+                                                    })
+                                                  }
+                                                  className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                                  title="Přidat krabici mezi"
+                                                >
+                                                  <Plus className="w-3 h-3" />
+                                                </button>
+                                              )}
+
                                               {/* The box */}
                                               <div
                                                 className={`relative group min-w-[130px] border-2 rounded-lg p-2.5 transition-all ${
@@ -547,25 +549,6 @@ export default function WarehousePage() {
                                                   </button>
                                                 </div>
                                               </div>
-
-                                              {/* Add above this box (between boxes or on top) */}
-                                              {stackIdx < stack.length - 1 ? (
-                                                <button
-                                                  onClick={() =>
-                                                    openBoxModal({
-                                                      shelfId: shelf.id,
-                                                      floor: floorIdx,
-                                                      row: box.row + 1,
-                                                      column: colIdx,
-                                                      action: "insertRow",
-                                                    })
-                                                  }
-                                                  className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
-                                                  title="Přidat krabici mezi"
-                                                >
-                                                  <Plus className="w-3 h-3" />
-                                                </button>
-                                              ) : null}
                                             </div>
                                           ))}
 
