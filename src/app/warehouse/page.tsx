@@ -479,46 +479,28 @@ export default function WarehousePage() {
                                           </button>
                                         )}
 
-                                        {/* Column stack (bottom to top) */}
-                                        <div className="flex flex-col-reverse gap-0.5">
-                                          {/* Add below bottom box (visually at bottom due to flex-col-reverse) */}
+                                        {/* Column stack (top to bottom visually) */}
+                                        <div className="flex flex-col gap-0.5 items-center">
+                                          {/* Add above top box */}
                                           <button
                                             onClick={() =>
                                               openBoxModal({
                                                 shelfId: shelf.id,
                                                 floor: floorIdx,
-                                                row: stack[0]?.row ?? 0,
+                                                row: (stack[stack.length - 1]?.row ?? 0) + 1,
                                                 column: colIdx,
                                                 action: "insertRow",
                                               })
                                             }
-                                            className="mx-auto p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
-                                            title="Přidat krabici pod"
+                                            className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                            title="Přidat krabici nahoru"
                                           >
-                                            <Plus className="w-3 h-3" />
+                                            <ArrowUp className="w-3 h-3" />
                                           </button>
 
-                                          {stack.map((box, stackIdx) => (
+                                          {/* Boxes from top (highest row) to bottom (row 0) */}
+                                          {[...stack].reverse().map((box, visualIdx) => (
                                             <div key={box.id} className="flex flex-col items-center gap-0.5">
-                                              {/* Insert between: button below this box (between this and the one below) */}
-                                              {stackIdx > 0 && (
-                                                <button
-                                                  onClick={() =>
-                                                    openBoxModal({
-                                                      shelfId: shelf.id,
-                                                      floor: floorIdx,
-                                                      row: box.row,
-                                                      column: colIdx,
-                                                      action: "insertRow",
-                                                    })
-                                                  }
-                                                  className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
-                                                  title="Přidat krabici mezi"
-                                                >
-                                                  <Plus className="w-3 h-3" />
-                                                </button>
-                                              )}
-
                                               {/* The box */}
                                               <div
                                                 className={`relative group min-w-[130px] border-2 rounded-lg p-2.5 transition-all ${
@@ -566,24 +548,43 @@ export default function WarehousePage() {
                                                   </button>
                                                 </div>
                                               </div>
+
+                                              {/* Insert between this box and the one below */}
+                                              {visualIdx < stack.length - 1 && (
+                                                <button
+                                                  onClick={() =>
+                                                    openBoxModal({
+                                                      shelfId: shelf.id,
+                                                      floor: floorIdx,
+                                                      row: box.row,
+                                                      column: colIdx,
+                                                      action: "insertRow",
+                                                    })
+                                                  }
+                                                  className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                                  title="Přidat krabici mezi"
+                                                >
+                                                  <Plus className="w-3 h-3" />
+                                                </button>
+                                              )}
                                             </div>
                                           ))}
 
-                                          {/* Add above top box */}
+                                          {/* Add below bottom box */}
                                           <button
                                             onClick={() =>
                                               openBoxModal({
                                                 shelfId: shelf.id,
                                                 floor: floorIdx,
-                                                row: (stack[stack.length - 1]?.row ?? 0) + 1,
+                                                row: stack[0]?.row ?? 0,
                                                 column: colIdx,
                                                 action: "insertRow",
                                               })
                                             }
-                                            className="mx-auto p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
-                                            title="Přidat krabici nahoru"
+                                            className="p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                            title="Přidat krabici pod"
                                           >
-                                            <ArrowUp className="w-3 h-3" />
+                                            <Plus className="w-3 h-3" />
                                           </button>
                                         </div>
 
