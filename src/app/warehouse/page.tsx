@@ -481,6 +481,23 @@ export default function WarehousePage() {
 
                                         {/* Column stack (bottom to top) */}
                                         <div className="flex flex-col-reverse gap-0.5">
+                                          {/* Add below bottom box (visually at bottom due to flex-col-reverse) */}
+                                          <button
+                                            onClick={() =>
+                                              openBoxModal({
+                                                shelfId: shelf.id,
+                                                floor: floorIdx,
+                                                row: stack[0]?.row ?? 0,
+                                                column: colIdx,
+                                                action: "insertRow",
+                                              })
+                                            }
+                                            className="mx-auto p-0.5 text-stone-300 hover:text-amber-600 cursor-pointer"
+                                            title="Přidat krabici pod"
+                                          >
+                                            <Plus className="w-3 h-3" />
+                                          </button>
+
                                           {stack.map((box, stackIdx) => (
                                             <div key={box.id} className="flex flex-col items-center gap-0.5">
                                               {/* Insert between: button below this box (between this and the one below) */}
