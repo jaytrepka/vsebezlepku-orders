@@ -54,6 +54,40 @@ async function decrementStockForOrder(items: { productName: string; quantity: nu
   }
 }
 
+// Decrement warehouse boxes for order items (highest priority shelf, earliest expiration first)
+async function decrementWarehouseForOrder(items: { productName: string; quantity: number }[]) {
+  for (const item of items) {
+    let remaining = item.quantity || 1;
+    const normalized = normalizeProductName(item.productName);
+
+    // Find boxes matching this product, ordered by shelf priority (desc) then expiration (asc)
+    const boxes = await prisma.shelfBox.findMany({
+      where: {
+        pieces: { gt: 0 },
+        OR: [
+          { productName: item.productName },
+          { productName: normalized },
+        ],
+      },
+      include: { shelf: true },
+      orderBy: [
+        { shelf: { priority: "desc" } },
+        { expirationDate: "asc" },
+      ],
+    });
+
+    for (const box of boxes) {
+      if (remaining <= 0) break;
+      const deduct = Math.min(remaining, box.pieces);
+      await prisma.shelfBox.update({
+        where: { id: box.id },
+        data: { pieces: box.pieces - deduct },
+      });
+      remaining -= deduct;
+    }
+  }
+}
+
 // GET - Return list of existing order numbers
 export async function GET() {
   try {
@@ -198,6 +232,12 @@ export async function POST(request: NextRequest) {
             productName: i.productName,
             quantity: i.quantity || 1,
             productCode: i.productCode || null,
+          })));
+
+          // Decrement warehouse boxes for newly created orders
+          await decrementWarehouseForOrder(items.map((i: { productName: string; quantity?: number }) => ({
+            productName: i.productName,
+            quantity: i.quantity || 1,
           })));
         }
       } catch (orderError) {
