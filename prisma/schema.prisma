@@ -130,3 +130,25 @@ model FairTransactionItem {
   transaction   FairTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   fairProduct   FairProduct     @relation(fields: [fairProductId], references: [id], onDelete: Cascade)
 }
+
+model Shelf {
+  id        String     @id @default(cuid())
+  name      String
+  priority  Int        @default(0)
+  boxes     ShelfBox[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model ShelfBox {
+  id             String    @id @default(cuid())
+  shelfId        String
+  row            Int       @default(0)
+  column         Int       @default(0)
+  productName    String
+  pieces         Int       @default(0)
+  expirationDate DateTime?
+  shelf          Shelf     @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
