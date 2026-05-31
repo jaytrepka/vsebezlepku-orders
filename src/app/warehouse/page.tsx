@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowRight, Search } from "lucide-react";
 
 interface ShelfBox {
   id: string;
@@ -54,6 +54,12 @@ export default function WarehousePage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  // Find/search feature
+  const [findQuery, setFindQuery] = useState("");
+  const [findShowSuggestions, setFindShowSuggestions] = useState(false);
+  const [activeFind, setActiveFind] = useState("");
+  const findRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetchShelves();
     fetchStockProducts();
@@ -63,6 +69,9 @@ export default function WarehousePage() {
     function handleClick(e: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
+      }
+      if (findRef.current && !findRef.current.contains(e.target as Node)) {
+        setFindShowSuggestions(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -234,6 +243,30 @@ export default function WarehousePage() {
     p.productName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Find feature: compute matching boxes and their locations
+  const findResults = activeFind
+    ? shelves
+        .flatMap((shelf) =>
+          shelf.boxes
+            .filter((box) => box.productName === activeFind)
+            .map((box) => ({
+              shelfName: shelf.name,
+              priority: shelf.priority,
+              column: box.column + 1,
+              row: box.row + 1,
+              pieces: box.pieces,
+              boxId: box.id,
+            }))
+        )
+        .sort((a, b) => b.priority - a.priority)
+    : [];
+
+  const highlightedBoxIds = new Set(findResults.map((r) => r.boxId));
+
+  const findFilteredProducts = stockProducts.filter((p) =>
+    p.productName.toLowerCase().includes(findQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-stone-100 p-4 sm:p-6">
       {/* Header */}
@@ -250,6 +283,74 @@ export default function WarehousePage() {
             <Plus className="w-4 h-4" />
             Přidat regál
           </button>
+        </div>
+
+        {/* Find product search */}
+        <div className="mb-5" ref={findRef}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+            <input
+              type="text"
+              value={findQuery}
+              onChange={(e) => {
+                setFindQuery(e.target.value);
+                setFindShowSuggestions(true);
+                if (!e.target.value) setActiveFind("");
+              }}
+              onFocus={() => setFindShowSuggestions(true)}
+              placeholder="Najít produkt ve skladu..."
+              className="w-full pl-10 pr-4 py-2.5 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+            />
+            {findShowSuggestions && findQuery && findFilteredProducts.length > 0 && (
+              <div className="absolute z-20 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {findFilteredProducts.slice(0, 15).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setFindQuery(p.productName);
+                      setActiveFind(p.productName);
+                      setFindShowSuggestions(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 truncate cursor-pointer"
+                  >
+                    {p.productName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Search results */}
+          {activeFind && (
+            <div className="mt-3 bg-white border border-amber-200 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-stone-700">
+                  📍 Nalezeno: {findResults.length} {findResults.length === 1 ? "krabice" : findResults.length < 5 ? "krabice" : "krabic"}
+                </h3>
+                <button
+                  onClick={() => { setActiveFind(""); setFindQuery(""); }}
+                  className="text-xs text-stone-500 hover:text-red-600 cursor-pointer"
+                >
+                  Zrušit hledání
+                </button>
+              </div>
+              {findResults.length === 0 ? (
+                <p className="text-sm text-stone-500">Produkt nebyl nalezen v žádném regálu.</p>
+              ) : (
+                <div className="space-y-1">
+                  {findResults.map((r, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-amber-800">{r.shelfName}</span>
+                      <span className="text-stone-400">—</span>
+                      <span className="text-stone-600">sloupec {r.column}, řada {r.row}</span>
+                      <span className="text-stone-400">·</span>
+                      <span className="font-semibold text-stone-800">{r.pieces} ks</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Message */}
@@ -322,10 +423,15 @@ export default function WarehousePage() {
                               {Array.from({ length: cols }, (_, colIdx) => {
                                 const box = grid[rowIdx][colIdx];
                                 if (box) {
+                                  const isHighlighted = highlightedBoxIds.has(box.id);
                                   return (
                                     <div
                                       key={`${rowIdx}-${colIdx}`}
-                                      className="relative group min-w-[140px] sm:min-w-[160px] bg-gradient-to-b from-amber-50 to-amber-100 border-2 border-amber-300 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow"
+                                      className={`relative group min-w-[140px] sm:min-w-[160px] border-2 rounded-lg p-3 shadow-sm hover:shadow-md transition-all ${
+                                        isHighlighted
+                                          ? "bg-gradient-to-b from-green-100 to-green-200 border-green-500 ring-2 ring-green-300 scale-105"
+                                          : "bg-gradient-to-b from-amber-50 to-amber-100 border-amber-300"
+                                      }`}
                                     >
                                       {/* Box content */}
                                       <div className="text-xs font-semibold text-stone-800 truncate" title={box.productName}>
