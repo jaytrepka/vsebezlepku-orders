@@ -226,11 +226,11 @@ export default function WarehousePage() {
     return new Date(date).toLocaleDateString("cs-CZ", { month: "short", year: "numeric" });
   }
 
-  // Get floors for a shelf
+  // Get floors for a shelf (all floors from 0 to max, even empty ones)
   function getFloors(shelf: Shelf): number[] {
     if (shelf.boxes.length === 0) return [0];
-    const floors = [...new Set(shelf.boxes.map((b) => b.floor))].sort((a, b) => a - b);
-    return floors.length > 0 ? floors : [0];
+    const maxFloor = Math.max(...shelf.boxes.map((b) => b.floor));
+    return Array.from({ length: maxFloor + 1 }, (_, i) => i);
   }
 
   // Get columns on a floor (sorted)
