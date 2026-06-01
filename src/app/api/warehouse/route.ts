@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const shelves = await prisma.shelf.findMany({
       include: { boxes: true },
-      orderBy: { priority: "desc" },
+      orderBy: [{ priority: "desc" }, { name: "asc" }],
     });
     return NextResponse.json(shelves);
   } catch (error) {
