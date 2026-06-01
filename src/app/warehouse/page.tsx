@@ -429,7 +429,7 @@ export default function WarehousePage() {
             {shelves.map((shelf) => {
               const floors = getFloors(shelf);
               return (
-                <div key={shelf.id} className="bg-white rounded-xl shadow-md border border-stone-200 overflow-hidden">
+                <div key={shelf.id} className="bg-white rounded-xl shadow-md border border-stone-200 overflow-visible">
                   {/* Bookcase header */}
                   <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-amber-100 to-amber-50 border-b border-stone-200">
                     <div className="flex items-center gap-3">
@@ -575,7 +575,8 @@ export default function WarehousePage() {
                                                   )}
                                                 </div>
                                                 {/* Tooltip on hover */}
-                                                <div className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none">
+                                                <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block pointer-events-none">
+                                                  <div className="w-2 h-2 bg-stone-800 rotate-45 mx-auto -mb-1" />
                                                   <div className="bg-stone-800 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg max-w-[250px]">
                                                     <div className="font-medium whitespace-normal">{box.productName}</div>
                                                     <div className="mt-1 text-stone-300">{box.pieces} ks</div>
@@ -591,7 +592,6 @@ export default function WarehousePage() {
                                                       </div>
                                                     )}
                                                   </div>
-                                                  <div className="w-2 h-2 bg-stone-800 rotate-45 mx-auto -mt-1" />
                                                 </div>
                                                 {/* Edit/Delete/Clone */}
                                                 <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
