@@ -30,6 +30,7 @@ export default function WarehousePage() {
   const [shelves, setShelves] = useState<Shelf[]>([]);
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [tooltip, setTooltip] = useState<{ box: ShelfBox; x: number; y: number } | null>(null);
 
   // Shelf modal
   const [shelfModal, setShelfModal] = useState<{
@@ -551,6 +552,11 @@ export default function WarehousePage() {
                                             <div key={box.id} className="flex flex-col items-center gap-0.5">
                                               {/* The box */}
                                               <div
+                                                onMouseEnter={(e) => {
+                                                  const rect = e.currentTarget.getBoundingClientRect();
+                                                  setTooltip({ box, x: rect.left + rect.width / 2, y: rect.top });
+                                                }}
+                                                onMouseLeave={() => setTooltip(null)}
                                                 className={`relative group min-w-[130px] border-2 rounded-lg p-2.5 transition-all ${
                                                   highlightedBoxIds.has(box.id)
                                                     ? "bg-gradient-to-b from-green-100 to-green-200 border-green-500 ring-2 ring-green-300 scale-105"
@@ -573,25 +579,6 @@ export default function WarehousePage() {
                                                       {formatExpDate(box.expirationDate)}
                                                     </span>
                                                   )}
-                                                </div>
-                                                {/* Tooltip on hover */}
-                                                <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block pointer-events-none">
-                                                  <div className="w-2 h-2 bg-stone-800 rotate-45 mx-auto -mb-1" />
-                                                  <div className="bg-stone-800 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg max-w-[250px]">
-                                                    <div className="font-medium whitespace-normal">{box.productName}</div>
-                                                    <div className="mt-1 text-stone-300">{box.pieces} ks</div>
-                                                    {box.expirationDate && (
-                                                      <div className={`mt-0.5 ${
-                                                        getExpUrgency(box.expirationDate) === "red"
-                                                          ? "text-red-300"
-                                                          : getExpUrgency(box.expirationDate) === "orange"
-                                                          ? "text-orange-300"
-                                                          : "text-stone-300"
-                                                      }`}>
-                                                        Expirace: {formatExpDateFull(box.expirationDate)}
-                                                      </div>
-                                                    )}
-                                                  </div>
                                                 </div>
                                                 {/* Edit/Delete/Clone */}
                                                 <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
@@ -837,6 +824,31 @@ export default function WarehousePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Fixed tooltip */}
+      {tooltip && (
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={{ left: tooltip.x, top: tooltip.y - 8, transform: "translate(-50%, -100%)" }}
+        >
+          <div className="bg-stone-800 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-[260px]">
+            <div className="font-medium">{tooltip.box.productName}</div>
+            <div className="mt-1 text-stone-300">{tooltip.box.pieces} ks</div>
+            {tooltip.box.expirationDate && (
+              <div className={`mt-0.5 ${
+                getExpUrgency(tooltip.box.expirationDate) === "red"
+                  ? "text-red-300"
+                  : getExpUrgency(tooltip.box.expirationDate) === "orange"
+                  ? "text-orange-300"
+                  : "text-stone-300"
+              }`}>
+                Expirace: {formatExpDateFull(tooltip.box.expirationDate)}
+              </div>
+            )}
+          </div>
+          <div className="w-2 h-2 bg-stone-800 rotate-45 mx-auto -mt-1" />
         </div>
       )}
     </div>
