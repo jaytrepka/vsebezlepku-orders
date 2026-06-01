@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowLeft, ArrowRight, Search, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowLeft, ArrowRight, Search, Layers, Copy } from "lucide-react";
 
 interface ShelfBox {
   id: string;
@@ -189,6 +189,38 @@ export default function WarehousePage() {
       setMessage({ type: "success", text: "Krabice smazána" });
     } catch {
       setMessage({ type: "error", text: "Chyba při mazání krabice" });
+    }
+  }
+
+  async function cloneBox(box: ShelfBox, direction: "above" | "right") {
+    try {
+      const body: Record<string, unknown> = {
+        shelfId: box.shelfId,
+        floor: box.floor,
+        productName: box.productName,
+        pieces: box.pieces,
+        expirationDate: box.expirationDate || null,
+      };
+
+      if (direction === "above") {
+        body.action = "insertRow";
+        body.row = box.row + 1;
+        body.column = box.column;
+      } else {
+        body.action = "insertColumn";
+        body.row = 0;
+        body.column = box.column + 1;
+      }
+
+      await fetch("/api/warehouse/boxes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      fetchShelves();
+      setMessage({ type: "success", text: "Krabice naklonována" });
+    } catch {
+      setMessage({ type: "error", text: "Chyba při klonování krabice" });
     }
   }
 
@@ -520,8 +552,22 @@ export default function WarehousePage() {
                                                     </span>
                                                   )}
                                                 </div>
-                                                {/* Edit/Delete */}
+                                                {/* Edit/Delete/Clone */}
                                                 <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
+                                                  <button
+                                                    onClick={() => cloneBox(box, "above")}
+                                                    className="p-1 bg-white/80 rounded hover:bg-blue-200 cursor-pointer"
+                                                    title="Klonovat nahoru"
+                                                  >
+                                                    <Copy className="w-3 h-3 text-blue-600" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => cloneBox(box, "right")}
+                                                    className="p-1 bg-white/80 rounded hover:bg-blue-200 cursor-pointer"
+                                                    title="Klonovat vpravo"
+                                                  >
+                                                    <ArrowRight className="w-3 h-3 text-blue-600" />
+                                                  </button>
                                                   <button
                                                     onClick={() =>
                                                       setBoxModal({
@@ -537,12 +583,14 @@ export default function WarehousePage() {
                                                       })
                                                     }
                                                     className="p-1 bg-white/80 rounded hover:bg-amber-200 cursor-pointer"
+                                                    title="Upravit"
                                                   >
                                                     <Pencil className="w-3 h-3 text-stone-600" />
                                                   </button>
                                                   <button
                                                     onClick={() => deleteBox(box.id)}
                                                     className="p-1 bg-white/80 rounded hover:bg-red-200 cursor-pointer"
+                                                    title="Smazat"
                                                   >
                                                     <Trash2 className="w-3 h-3 text-red-600" />
                                                   </button>
