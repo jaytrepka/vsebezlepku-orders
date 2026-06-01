@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowLeft, ArrowRight, Search, Layers, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowUp, ArrowLeft, ArrowRight, Search, Layers, Copy, Info, X } from "lucide-react";
 
 interface ShelfBox {
   id: string;
@@ -31,6 +31,7 @@ export default function WarehousePage() {
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [tooltip, setTooltip] = useState<{ box: ShelfBox; x: number; y: number } | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Shelf modal
   const [shelfModal, setShelfModal] = useState<{
@@ -330,6 +331,13 @@ export default function WarehousePage() {
           <div className="flex items-center gap-3">
             <Package className="w-7 h-7 text-amber-700" />
             <h1 className="text-2xl font-bold text-stone-800">Sklad</h1>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="p-1.5 text-stone-400 hover:text-amber-700 hover:bg-amber-100 rounded-full cursor-pointer"
+              title="Nápověda"
+            >
+              <Info className="w-5 h-5" />
+            </button>
           </div>
           <button
             onClick={() => setShelfModal({ open: true, name: "", priority: "0" })}
@@ -823,6 +831,91 @@ export default function WarehousePage() {
                 Zrušit
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-stone-800">Jak používat Sklad</h2>
+              <button onClick={() => setShowHelp(false)} className="p-1 hover:bg-stone-100 rounded cursor-pointer">
+                <X className="w-5 h-5 text-stone-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-stone-700">
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">📦 Regál (bookcase)</h3>
+                <p>Regál je skříň s patry. Každý regál má <strong>název</strong> a <strong>prioritu</strong> — při automatickém odečítání ze skladu se odebírá nejdříve z regálu s nejvyšší prioritou.</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">📐 Patra (floors)</h3>
+                <p>Každý regál má jedno nebo více pater. Patro přidáte tlačítkem <strong>„+ Patro"</strong> v záhlaví regálu. Nové patro se přidá navrch.</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">🗂️ Sloupce a krabice</h3>
+                <p>Na každém patře jsou sloupce. Každý sloupec obsahuje jednu nebo více krabic naskládaných na sobě.</p>
+                <ul className="list-disc ml-5 mt-1 space-y-0.5">
+                  <li><strong>← →</strong> (šipky vlevo/vpravo) — vloží nový sloupec. Všechny sloupce napravo se posunou.</li>
+                  <li><strong>↑</strong> (šipka nahoru) — přidá krabici na vrch sloupce.</li>
+                  <li><strong>+</strong> (mezi krabicemi) — vloží krabici mezi dvě existující. Krabice nad se posunou nahoru.</li>
+                  <li><strong>+</strong> (dole pod sloupcem) — přidá krabici pod nejnižší v daném sloupci.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">🖱️ Ikony na krabici (po najetí myší)</h3>
+                <div className="space-y-1 mt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 rounded"><Copy className="w-3 h-3 text-blue-600" /></span>
+                    <span><strong>Klonovat nahoru</strong> — vytvoří kopii krabice (stejný produkt, kusy, expirace) nad aktuální krabicí.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 rounded"><ArrowRight className="w-3 h-3 text-blue-600" /></span>
+                    <span><strong>Klonovat vpravo</strong> — vytvoří kopii v novém sloupci napravo. Sloupce napravo se posunou.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-amber-100 rounded"><Pencil className="w-3 h-3 text-stone-600" /></span>
+                    <span><strong>Upravit</strong> — změní produkt, kusy nebo expiraci.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-red-100 rounded"><Trash2 className="w-3 h-3 text-red-600" /></span>
+                    <span><strong>Smazat</strong> — odstraní krabici.</span>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">📅 Expirace (barevné označení)</h3>
+                <ul className="list-disc ml-5 space-y-0.5">
+                  <li><span className="text-red-600 font-semibold">Červená</span> — expirace do 1 měsíce</li>
+                  <li><span className="text-orange-600 font-semibold">Oranžová</span> — expirace 1–2 měsíce</li>
+                  <li><span className="text-stone-500">Šedá</span> — expirace více než 2 měsíce</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">🔍 Hledání produktu</h3>
+                <p>Vyhledávací pole nahoře najde produkt ve všech regálech. Zobrazí přesnou pozici (regál, patro, sloupec, řada) a zvýrazní krabice zeleně.</p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-stone-800 mb-1">🔄 Automatické odečítání</h3>
+                <p>Při nové objednávce ze Shoptetu se automaticky odečtou kusy z krabic — nejdříve z regálu s nejvyšší prioritou, v rámci regálu z krabice s nejbližší expirací.</p>
+              </section>
+            </div>
+
+            <button
+              onClick={() => setShowHelp(false)}
+              className="mt-5 w-full bg-amber-600 text-white py-2 rounded-lg hover:bg-amber-700 cursor-pointer"
+            >
+              Rozumím
+            </button>
           </div>
         </div>
       )}
