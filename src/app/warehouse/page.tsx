@@ -258,6 +258,22 @@ export default function WarehousePage() {
     return new Date(date).toLocaleDateString("cs-CZ", { month: "short", year: "numeric" });
   }
 
+  function formatExpDateFull(date: string | null): string {
+    if (!date) return "";
+    return new Date(date).toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function getExpUrgency(date: string | null): "red" | "orange" | "normal" {
+    if (!date) return "normal";
+    const now = new Date();
+    const exp = new Date(date);
+    const diffMs = exp.getTime() - now.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays <= 30) return "red";
+    if (diffDays <= 60) return "orange";
+    return "normal";
+  }
+
   // Get floors for a shelf (all floors from 0 to max, even empty ones)
   function getFloors(shelf: Shelf): number[] {
     if (shelf.boxes.length === 0) return [0];
@@ -541,16 +557,41 @@ export default function WarehousePage() {
                                                     : "bg-gradient-to-b from-amber-50 to-amber-100 border-amber-300 hover:shadow-md"
                                                 }`}
                                               >
-                                                <div className="text-xs font-semibold text-stone-800 truncate max-w-[120px]" title={box.productName}>
+                                                <div className="text-xs font-semibold text-stone-800 truncate max-w-[120px]">
                                                   {shortenName(box.productName)}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 mt-0.5">
                                                   <span className="text-sm font-bold text-amber-800">{box.pieces} ks</span>
                                                   {box.expirationDate && (
-                                                    <span className="text-[10px] text-stone-500 bg-white px-1 rounded">
+                                                    <span className={`text-[10px] px-1 rounded ${
+                                                      getExpUrgency(box.expirationDate) === "red"
+                                                        ? "bg-red-100 text-red-700 font-semibold"
+                                                        : getExpUrgency(box.expirationDate) === "orange"
+                                                        ? "bg-orange-100 text-orange-700 font-semibold"
+                                                        : "bg-white text-stone-500"
+                                                    }`}>
                                                       {formatExpDate(box.expirationDate)}
                                                     </span>
                                                   )}
+                                                </div>
+                                                {/* Tooltip on hover */}
+                                                <div className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none">
+                                                  <div className="bg-stone-800 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg max-w-[250px]">
+                                                    <div className="font-medium whitespace-normal">{box.productName}</div>
+                                                    <div className="mt-1 text-stone-300">{box.pieces} ks</div>
+                                                    {box.expirationDate && (
+                                                      <div className={`mt-0.5 ${
+                                                        getExpUrgency(box.expirationDate) === "red"
+                                                          ? "text-red-300"
+                                                          : getExpUrgency(box.expirationDate) === "orange"
+                                                          ? "text-orange-300"
+                                                          : "text-stone-300"
+                                                      }`}>
+                                                        Expirace: {formatExpDateFull(box.expirationDate)}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                  <div className="w-2 h-2 bg-stone-800 rotate-45 mx-auto -mt-1" />
                                                 </div>
                                                 {/* Edit/Delete/Clone */}
                                                 <div className="absolute top-0.5 right-0.5 hidden group-hover:flex gap-0.5">
