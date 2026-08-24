@@ -51,7 +51,7 @@ export default function Home() {
     productName: string;
     productUrl?: string;
     isEdit: boolean;
-    language: "cs" | "pl" | "sk";
+    language: "cs" | "pl" | "sk" | "hu";
   } | null>(null);
   const [labelForm, setLabelForm] = useState({
     nazev: "",
@@ -62,13 +62,14 @@ export default function Home() {
   });
   const [fetchingProductInfo, setFetchingProductInfo] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk">("cs");
+  const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk" | "hu">("cs");
   const [languageLabels, setLanguageLabels] = useState<Map<string, ProductLabel>>(new Map());
 
   const languageNames = {
     cs: "Čeština",
     pl: "Polski",
     sk: "Slovenčina",
+    hu: "Magyar",
   };
 
   // Get label for product in selected language
@@ -443,7 +444,7 @@ export default function Home() {
     );
   }
 
-  function openLabelModal(productName: string, existingLabel?: ProductLabel | null, productUrl?: string, language: "cs" | "pl" | "sk" = "cs") {
+  function openLabelModal(productName: string, existingLabel?: ProductLabel | null, productUrl?: string, language: "cs" | "pl" | "sk" | "hu" = "cs") {
     setLabelModal({ open: true, productName, productUrl, isEdit: !!existingLabel, language });
     if (existingLabel) {
       setLabelForm({
@@ -464,7 +465,7 @@ export default function Home() {
     }
   }
 
-  async function switchModalLanguage(newLang: "cs" | "pl" | "sk") {
+  async function switchModalLanguage(newLang: "cs" | "pl" | "sk" | "hu") {
     if (!labelModal) return;
     
     // Fetch label for the new language
@@ -541,7 +542,7 @@ export default function Home() {
               VšeBezLepku Objednávky
             </h1>
             <div className="flex items-center gap-1">
-              {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"]] as const).map(([lang, flag]) => (
+              {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"], ["hu", "🇭🇺"]] as const).map(([lang, flag]) => (
                 <button
                   key={lang}
                   onClick={() => setLabelLanguage(lang)}
@@ -903,7 +904,7 @@ export default function Home() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Jazyk štítku</label>
               <div className="flex gap-2">
-                {(["cs", "pl", "sk"] as const).map((lang) => (
+                {(["cs", "pl", "sk", "hu"] as const).map((lang) => (
                   <button
                     key={lang}
                     type="button"
@@ -914,7 +915,7 @@ export default function Home() {
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    {lang === "cs" ? "🇨🇿 CZ" : lang === "pl" ? "🇵🇱 PL" : "🇸🇰 SK"}
+                    {lang === "cs" ? "🇨🇿 CZ" : lang === "pl" ? "🇵🇱 PL" : lang === "sk" ? "🇸🇰 SK" : "🇭🇺 HU"}
                   </button>
                 ))}
               </div>

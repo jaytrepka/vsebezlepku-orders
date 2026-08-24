@@ -55,7 +55,7 @@ export interface LabelRequest {
 }
 
 // Language-specific label headers
-type LabelLanguage = "cs" | "pl" | "sk";
+type LabelLanguage = "cs" | "pl" | "sk" | "hu";
 
 const labelHeaders: Record<LabelLanguage, {
   slozeni: string;
@@ -76,6 +76,11 @@ const labelHeaders: Record<LabelLanguage, {
     slozeni: "Zloženie:",
     nutricniHodnoty: "Nutričné hodnoty (na 100g):",
     vyrobce: "Výrobca:",
+  },
+  hu: {
+    slozeni: "Összetevők:",
+    nutricniHodnoty: "Tápérték (100g-ra vetítve):",
+    vyrobce: "Gyártó:",
   },
 };
 

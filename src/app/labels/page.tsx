@@ -66,7 +66,7 @@ export default function LabelsPage() {
   const [labels, setLabels] = useState<Map<string, ProductLabel>>(new Map());
   const [allLabels, setAllLabels] = useState<ProductLabel[]>([]);
   const [selected, setSelected] = useState<Map<string, number>>(new Map());
-  const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk">("cs");
+  const [labelLanguage, setLabelLanguage] = useState<"cs" | "pl" | "sk" | "hu">("cs");
   const [filterBrands, setFilterBrands] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [startPosition, setStartPosition] = useState(1);
@@ -78,7 +78,7 @@ export default function LabelsPage() {
     open: boolean;
     productName: string;
     isEdit: boolean;
-    language: "cs" | "pl" | "sk";
+    language: "cs" | "pl" | "sk" | "hu";
   } | null>(null);
   const [labelForm, setLabelForm] = useState({
     nazev: "",
@@ -245,7 +245,7 @@ export default function LabelsPage() {
     }
   }
 
-  async function switchModalLanguage(newLang: "cs" | "pl" | "sk") {
+  async function switchModalLanguage(newLang: "cs" | "pl" | "sk" | "hu") {
     if (!labelModal) return;
     try {
       const res = await fetch(`/api/labels?language=${newLang}`);
@@ -328,7 +328,7 @@ export default function LabelsPage() {
               Produktové štítky
             </h1>
             <div className="flex items-center gap-1">
-              {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"]] as const).map(([lang, flag]) => (
+              {([["cs", "🇨🇿"], ["sk", "🇸🇰"], ["pl", "🇵🇱"], ["hu", "🇭🇺"]] as const).map(([lang, flag]) => (
                 <button
                   key={lang}
                   onClick={() => setLabelLanguage(lang)}
@@ -553,7 +553,7 @@ export default function LabelsPage() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Jazyk štítku</label>
               <div className="flex gap-2">
-                {(["cs", "pl", "sk"] as const).map((lang) => (
+                {(["cs", "pl", "sk", "hu"] as const).map((lang) => (
                   <button
                     key={lang}
                     type="button"
@@ -564,7 +564,7 @@ export default function LabelsPage() {
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    {lang === "cs" ? "🇨🇿 CZ" : lang === "pl" ? "🇵🇱 PL" : "🇸🇰 SK"}
+                    {lang === "cs" ? "🇨🇿 CZ" : lang === "pl" ? "🇵🇱 PL" : lang === "sk" ? "🇸🇰 SK" : "🇭🇺 HU"}
                   </button>
                 ))}
               </div>
