@@ -598,13 +598,16 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
     // Check if product exists in Allegro Catalog
     const catalogProductId = await searchAllegroCatalog(token, params.titlePl, params.ean);
 
-    // Extract weight in grams from title if not specified
+    // Extract weight in grams from title, params or description
     let weight = params.weightGrams ? String(params.weightGrams) : undefined;
     if (!weight) {
-      const weightMatch = params.titlePl.match(/(\d+)\s*g\b/i);
+      const weightMatch = (params.titlePl + " " + (params.descriptionHtml || "")).match(/(\d+)\s*g\b/i);
       if (weightMatch) {
         weight = weightMatch[1];
       }
+    }
+    if (!weight) {
+      weight = "200"; // Safe default so Allegro parameter 221929 is never missing
     }
 
     // Determine brand

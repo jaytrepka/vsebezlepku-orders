@@ -37,7 +37,12 @@ export function detectAllegroCategory(url?: string, title?: string): string {
 function extractFromHtml(html: string) {
   // 1. Extract Product Name
   const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const productName = h1Match ? h1Match[1].replace(/<[^>]+>/g, "").trim() : "";
+  const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
+  const dataLayerNameMatch = html.match(/"product":\s*\{[\s\S]*?"name":\s*"([^"]+)"/i);
+  let productName = h1Match ? h1Match[1].replace(/<[^>]+>/g, "").trim() : "";
+  if (!productName || productName === "-" || productName.length < 3) {
+    productName = dataLayerNameMatch ? dataLayerNameMatch[1].trim() : (ogTitleMatch ? ogTitleMatch[1].trim() : "");
+  }
 
   // 2. Extract Product Code / SKU
   const codeMatch = html.match(/"code":\s*"?([A-Za-z0-9_-]+)"?/i)
@@ -63,7 +68,23 @@ function extractFromHtml(html: string) {
     || html.match(/EAN:[^0-9]*([0-9]{8,14})/i);
   const ean = eanMatch ? eanMatch[1].trim() : "";
 
-  // 4. Extract Images
+  // 4. Extract Weight
+  let weight = "";
+  const weightMatch = html.match(/"weight":\s*([0-9.]+)/i);
+  if (weightMatch) {
+    const w = parseFloat(weightMatch[1]);
+    if (w > 0) {
+      weight = w < 5 ? String(Math.round(w * 1000)) : String(Math.round(w));
+    }
+  }
+  if (!weight) {
+    const textWeight = (productName + " " + html).match(/(\d+)\s*g\b/i);
+    if (textWeight) {
+      weight = textWeight[1];
+    }
+  }
+
+  // 5. Extract Images
   const imageUrls: string[] = [];
   const imgRegex = /<a[^>]+href="([^"]+\.(?:jpg|jpeg|png|webp))"[^>]+data-gallery/gi;
   let match;
@@ -79,7 +100,7 @@ function extractFromHtml(html: string) {
     }
   }
 
-  // 5. Extract Description
+  // 6. Extract Description
   const descMatch = html.match(/<div[^>]+id="description"[^>]*>([\s\S]*?)<\/div>/i)
     || html.match(/<div[^>]+class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
   const descriptionHtml = descMatch ? descMatch[1].trim() : "";
@@ -88,6 +109,7 @@ function extractFromHtml(html: string) {
     productName,
     productCode,
     ean,
+    weight,
     imageUrls,
     descriptionHtml,
   };
@@ -457,7 +479,6 @@ export async function POST(request: NextRequest) {
               ...(finalProductCode ? [{ productName: finalProductCode }] : []),
               ...(scrapedData.productName ? [
                 { productName: scrapedData.productName },
-                { productName: { contains: finalProductCode || "___" } }
               ] : []),
             ],
           },
@@ -469,8 +490,8 @@ export async function POST(request: NextRequest) {
 
     // 2. Determine final Polish title
     let finalTitle = titlePl;
-    if (!finalTitle) {
-      if (dbLabelPl?.nazev) {
+    if (!finalTitle || finalTitle.trim().length < 3 || /^-+$/.test(finalTitle.trim())) {
+      if (dbLabelPl?.nazev && dbLabelPl.nazev.trim().length > 3 && !/^-+$/.test(dbLabelPl.nazev.trim())) {
         finalTitle = dbLabelPl.nazev;
       } else {
         const rawTitle = scrapedData.productName || "Bezglutenowy produkt";
@@ -478,6 +499,9 @@ export async function POST(request: NextRequest) {
       }
     }
     finalTitle = finalTitle.replace(/\s+/g, " ").trim().replace(/,\s*$/, "");
+    if (!finalTitle || finalTitle.length < 3 || /^-+$/.test(finalTitle)) {
+      finalTitle = "Piaceri Mediterranei produkt bezglutenowy";
+    }
 
     // 3. Determine final Polish description HTML
     let finalDescription = descriptionHtml;
@@ -500,7 +524,8 @@ export async function POST(request: NextRequest) {
     // 4. Determine EAN
     let finalEan = customEan || scrapedData.ean;
     if (!finalEan) {
-      if (finalProductCode === "D186" || finalProductCode === "1043" || /donut.*ruzov|donuts.*pink/i.test(url || "")) finalEan = "8028169207254";
+      if (finalProductCode === "D187" || /livance|pancake/i.test(url || "")) finalEan = "8028169206189";
+      else if (finalProductCode === "D186" || finalProductCode === "1043" || /donut.*ruzov|donuts.*pink/i.test(url || "")) finalEan = "8028169207254";
       else if (finalProductCode === "D136" || /donut.*pistac/i.test(url || "")) finalEan = "8028169207261";
       else if (/donut.*bil|donuts.*white/i.test(url || "")) finalEan = "8028169207230";
       else if (/donut.*orisk|donuts.*hazelnut/i.test(url || "")) finalEan = "8028169207247";
@@ -519,6 +544,7 @@ export async function POST(request: NextRequest) {
     }
 
     const finalCategoryId = categoryId || detectAllegroCategory(url, finalTitle);
+    const finalWeight = customWeight || scrapedData.weight || undefined;
 
     // 5. Determine stock
     let stockCount = typeof customStock === "number" ? customStock : null;
@@ -554,7 +580,7 @@ export async function POST(request: NextRequest) {
       categoryId: finalCategoryId,
       ean: finalEan,
       brand: customBrand,
-      weightGrams: customWeight,
+      weightGrams: finalWeight,
     });
 
     if (!createResult.success) {
