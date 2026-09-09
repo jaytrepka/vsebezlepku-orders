@@ -8,10 +8,13 @@ function extractFromHtml(html: string) {
   const productName = h1Match ? h1Match[1].replace(/<[^>]+>/g, "").trim() : "";
 
   // 2. Extract Product Code / SKU
-  const codeMatch = html.match(/(?:Kód produktu|Kód|Kód zboží|itemprop="sku")[^>]*>[\s\S]*?([A-Za-z0-9_-]+)/i)
+  const codeMatch = html.match(/"code":\s*"?([A-Za-z0-9_-]+)"?/i)
     || html.match(/data-code="([^"]+)"/i)
-    || html.match(/content="([^"]+)"\s+itemprop="sku"/i);
-  const productCode = codeMatch ? codeMatch[1].trim() : "";
+    || html.match(/itemprop="sku"[^>]*content="([^"]+)"/i)
+    || html.match(/itemprop="sku"[^>]*>([^<]+)<\//i)
+    || html.match(/<span[^>]*class="[^"]*(?:val-sku|p-code)[^"]*"[^>]*>([^<]+)<\//i)
+    || html.match(/(?:Kód produktu|Kód zboží|Kód)[\s\S]*?<strong[^>]*>([^<]+)<\/strong>/i);
+  const productCode = codeMatch && codeMatch[1].toLowerCase() !== "span" ? codeMatch[1].trim() : "";
 
   // 3. Extract EAN
   const eanMatch = html.match(/itemprop="gtin13"[^>]*content="([^"]+)"/i)
