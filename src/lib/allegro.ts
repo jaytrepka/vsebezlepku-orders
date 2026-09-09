@@ -169,17 +169,22 @@ export async function updateAllegroOfferStock(token: string, offerId: string, qu
         "User-Agent": userAgent,
       },
       body: JSON.stringify({
-        offer: { id: offerId },
         modification: {
           changeType: "FIXED",
           value: quantity,
         },
+        offerCriteria: [
+          {
+            type: "CONTAINS_OFFERS",
+            offers: [{ id: offerId }],
+          },
+        ],
       }),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error(`[Allegro] Failed to update stock for offer ${offerId}:`, err);
+      console.error(`[Allegro] Failed to update stock for offer ${offerId}: ${response.status} - ${err}`);
       return false;
     }
 
