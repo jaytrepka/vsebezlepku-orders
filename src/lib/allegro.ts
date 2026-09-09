@@ -59,12 +59,13 @@ export async function getAllegroAccessToken(): Promise<string | null> {
 }
 
 /**
- * Finds the Allegro Offer ID matching a Shoptet product code (SKU / external.id)
+ * Finds the Allegro Offer ID matching a Shoptet product code (SKU / external.id) or product name
  */
-export async function getAllegroOfferIdByCode(token: string, productCode: string): Promise<string | null> {
+export async function getAllegroOfferIdByCode(token: string, productCode: string, productName?: string): Promise<string | null> {
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
 
   try {
+    // 1. First attempt: search by external.id
     const response = await fetch(`${ALLEGRO_API_URL}/sale/offers?external.id=${encodeURIComponent(productCode)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -73,13 +74,27 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
       },
     });
 
-    if (!response.ok) {
-      return null;
+    if (response.ok) {
+      const data = await response.json();
+      if (data.offers && data.offers.length > 0) {
+        return data.offers[0].id;
+      }
     }
 
-    const data = await response.json();
-    if (data.offers && data.offers.length > 0) {
-      return data.offers[0].id;
+    // 2. Second attempt: search by phrase matching the code
+    const phraseResponse = await fetch(`${ALLEGRO_API_URL}/sale/offers?phrase=${encodeURIComponent(productCode)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.allegro.public.v1+json",
+        "User-Agent": userAgent,
+      },
+    });
+
+    if (phraseResponse.ok) {
+      const data = await phraseResponse.json();
+      if (data.offers && data.offers.length > 0) {
+        return data.offers[0].id;
+      }
     }
 
     return null;
@@ -88,6 +103,7 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
     return null;
   }
 }
+
 
 /**
  * Updates the stock quantity of an offer on Allegro
