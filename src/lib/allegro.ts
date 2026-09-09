@@ -13,10 +13,11 @@ export async function getAllegroAccessToken(): Promise<string | null> {
   const clientId = process.env.ALLEGRO_CLIENT_ID;
   const clientSecret = process.env.ALLEGRO_CLIENT_SECRET;
   const refreshToken = process.env.ALLEGRO_REFRESH_TOKEN;
+  const redirectUri = process.env.ALLEGRO_REDIRECT_URI || "https://vsebezlepku-orders.vercel.app/api/allegro/callback";
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
 
   if (!clientId || !clientSecret || !refreshToken) {
-    console.warn("[Allegro] Allegro credentials or ALLEGRO_REFRESH_TOKEN not configured. Skipping Allegro API sync.");
+    console.warn(`[Allegro] Missing credentials: clientId=${!!clientId}, clientSecret=${!!clientSecret}, refreshToken=${!!refreshToken}`);
     return null;
   }
 
@@ -29,13 +30,20 @@ export async function getAllegroAccessToken(): Promise<string | null> {
   try {
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
-    const response = await fetch(`${ALLEGRO_AUTH_URL}?grant_type=refresh_token&refresh_token=${refreshToken}`, {
+    const bodyParams = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken.trim(),
+      redirect_uri: redirectUri,
+    });
+
+    const response = await fetch(ALLEGRO_AUTH_URL, {
       method: "POST",
       headers: {
         Authorization: `Basic ${basicAuth}`,
         "User-Agent": userAgent,
         "Content-Type": "application/x-www-form-urlencoded",
       },
+      body: bodyParams.toString(),
     });
 
     if (!response.ok) {
