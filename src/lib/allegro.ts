@@ -686,7 +686,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       },
     };
 
-    const response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers`, {
+    let response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -697,8 +697,64 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       body: JSON.stringify(payload),
     });
 
+    let errText = "";
     if (!response.ok && response.status !== 202 && response.status !== 201) {
-      const errText = await response.text();
+      errText = await response.text();
+      console.warn(`[Allegro] Initial offer creation returned status ${response.status}: ${errText}`);
+
+      // Auto-healing for 422 errors (CATEGORY_MISMATCH, existing catalog product match, etc.)
+      if (response.status === 422) {
+        let shouldRetry = false;
+        try {
+          const errJson = JSON.parse(errText);
+          const errors = errJson.errors || [];
+          for (const errItem of errors) {
+            const existingCatId = errItem.metadata?.existingCategoryId;
+            const existingProdId = errItem.metadata?.existingProductId;
+
+            if (existingCatId || existingProdId) {
+              if (existingCatId) {
+                payload.category = { id: existingCatId };
+                if (payload.productSet?.[0]?.product?.category) {
+                  payload.productSet[0].product.category = { id: existingCatId };
+                }
+              }
+              if (existingProdId) {
+                payload.productSet = [{ product: { id: existingProdId } }];
+              }
+              shouldRetry = true;
+              break;
+            }
+          }
+        } catch (parseErr) {
+          console.error("[Allegro] Error parsing 422 JSON:", parseErr);
+        }
+
+        if (shouldRetry) {
+          console.log(`[Allegro] 🔄 Auto-healing 422 CATEGORY_MISMATCH / existing product. Retrying offer creation with updated payload:`, {
+            category: payload.category,
+            productSet: payload.productSet,
+          });
+
+          response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/vnd.allegro.public.v1+json",
+              "Content-Type": "application/vnd.allegro.public.v1+json",
+              "User-Agent": userAgent,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok && response.status !== 202 && response.status !== 201) {
+            errText = await response.text();
+          }
+        }
+      }
+    }
+
+    if (!response.ok && response.status !== 202 && response.status !== 201) {
       console.error(`[Allegro] Failed to create product-offer: ${response.status} - ${errText}`);
       return { 
         success: false, 

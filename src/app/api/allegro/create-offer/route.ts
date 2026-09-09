@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllegroAccessToken, createAllegroOffer } from "@/lib/allegro";
 import { prisma } from "@/lib/prisma";
 
+export function detectAllegroCategory(url?: string, title?: string): string {
+  const combined = `${url || ""} ${title || ""}`.toLowerCase();
+
+  // 1. Bread, buns, baguettes, rolls, toast, panini, wraps -> Pieczywo bezglutenowe (261421)
+  if (/chleb|baget|housk|pečiv|peciv|panini|ciabatt|burger|hamburg|toast|toust|bułk|bulk|wrap|tortill|piadin|focacc|korpus|hot dog|bulka|chleba/i.test(combined)) {
+    return "261421"; // Pieczywo bezglutenowe
+  }
+
+  // 2. Pasta, noodles, spaghetti, gnocchi -> Makarony bezglutenowe (261419)
+  if (/testovin|těstovin|makaron|spaghetti|penne|fusilli|tagliatelle|nudl|lasagn|farfalle|gnocchi|tortellin/i.test(combined)) {
+    return "261419"; // Makarony bezglutenowe
+  }
+
+  // 3. Flours, mixes, breadcrumbs, premixes -> Mąki i mieszanki bezglutenowe (261418)
+  if (/mouk|mąk|mak[ai]|směs|smes|mieszank|premix|strouhank|panierk|bułka tarta|krupic/i.test(combined)) {
+    return "261418"; // Mąki i mieszanki bezglutenowe
+  }
+
+  // 4. Sweets, snacks, biscuits, cakes, cookies, wafers -> Słodycze i przekąski bezglutenowe (261420)
+  if (/sladkost|sušenk|susenk|ciastk|herbatnik|wafl|baton|czekolad|čokolád|snack|chips|croissant|muffin|sfogli|pierniczk|perníčk|koláč|kolac|pernik|biscott/i.test(combined)) {
+    return "261420"; // Słodycze i przekąski bezglutenowe
+  }
+
+  // 5. Flakes, cereals, muesli, porridge -> 261422 (Płatki, musli i kasze bezglutenowe)
+  if (/vločk|vlock|płatk|platk|musli|muesli|granola|kaše|kase|kasz/i.test(combined)) {
+    return "261422"; // Płatki, musli i kasze bezglutenowe
+  }
+
+  // Default fallback category (Słodycze i przekąski)
+  return "261420";
+}
+
 function extractFromHtml(html: string) {
   // 1. Extract Product Name
   const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
@@ -18,8 +50,17 @@ function extractFromHtml(html: string) {
 
   // 3. Extract EAN
   const eanMatch = html.match(/itemprop="gtin13"[^>]*content="([^"]+)"/i)
-    || html.match(/EAN:[^<]*<strong[^>]*>([^<]+)<\/strong>/i)
-    || html.match(/EAN:[^<]*([0-9]{8,14})/i);
+    || html.match(/itemprop="gtin13"[^>]*>([^<]+)<\//i)
+    || html.match(/itemprop="gtin"[^>]*content="([^"]+)"/i)
+    || html.match(/itemprop="gtin"[^>]*>([^<]+)<\//i)
+    || html.match(/"gtin13":\s*"([0-9]{8,14})"/i)
+    || html.match(/"gtin":\s*"([0-9]{8,14})"/i)
+    || html.match(/"ean":\s*"([0-9]{8,14})"/i)
+    || html.match(/data-ean="([0-9]{8,14})"/i)
+    || html.match(/class="[^"]*(?:val-ean|p-ean)[^"]*"[^>]*>([0-9]{8,14})<\//i)
+    || html.match(/(?:EAN|Kód EAN)[\s\S]*?<strong[^>]*>([0-9]{8,14})<\/strong>/i)
+    || html.match(/(?:EAN|Kód EAN)[\s\S]*?<td[^>]*>([0-9]{8,14})<\/td>/i)
+    || html.match(/EAN:[^0-9]*([0-9]{8,14})/i);
   const ean = eanMatch ? eanMatch[1].trim() : "";
 
   // 4. Extract Images
@@ -112,13 +153,22 @@ export async function POST(request: NextRequest) {
 
     let finalEan = customEan || scrapedData.ean;
     if (!finalEan) {
-      if (finalProductCode === "S064") finalEan = "8028169209531";
-      else if (finalProductCode === "S063" || (url && /pernicky|pan-di-zenzero/i.test(url))) finalEan = "8028169209395";
+      if (finalProductCode === "S064" || /linecke/i.test(url || "")) finalEan = "8028169209531";
+      else if (finalProductCode === "S063" || /pernicky|pan-di-zenzero/i.test(url || "")) finalEan = "8028169209395";
+      else if (finalProductCode === "781" || /hamburger/i.test(url || "")) finalEan = "8028169209210";
+      else if (/piadina/i.test(url || "")) finalEan = "8028169209241";
+      else if (/ciabatta/i.test(url || "")) finalEan = "8028169209227";
+      else if (/baget/i.test(url || "")) finalEan = "8028169209203";
+      else if (/pan-carre|toust/i.test(url || "")) finalEan = "8028169209197";
+      else if (/farfalle/i.test(url || "")) finalEan = "8028169002019";
+      else if (/bbq/i.test(url || "")) finalEan = "8028169002231";
       else {
         // Fallback: generate a valid checksummed EAN-13 so Allegro product creation never fails
         finalEan = generateValidEan13(finalProductCode || url || finalTitle);
       }
     }
+
+    const finalCategoryId = categoryId || detectAllegroCategory(url, finalTitle);
 
     // Determine stock
     let stockCount = typeof customStock === "number" ? customStock : null;
@@ -147,7 +197,7 @@ export async function POST(request: NextRequest) {
       stockCount,
       imageUrls: finalImages,
       descriptionHtml: finalDescription,
-      categoryId: categoryId || "261420",
+      categoryId: finalCategoryId,
       ean: finalEan,
       brand: customBrand,
       weightGrams: customWeight,
