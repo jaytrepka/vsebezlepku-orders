@@ -758,131 +758,144 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
     });
 
     let errText = "";
-    if (!response.ok && response.status !== 202 && response.status !== 201) {
+    let retryCount = 0;
+    while (!response.ok && response.status === 422 && retryCount < 3) {
       errText = await response.text();
-      console.warn(`[Allegro] Initial offer creation returned status ${response.status}: ${errText}`);
+      console.warn(`[Allegro] Offer creation attempt ${retryCount + 1} returned status 422: ${errText}`);
+      let shouldRetry = false;
 
-      // Auto-healing for 422 errors (CATEGORY_MISMATCH, existing catalog product match, missing parameters, etc.)
-      if (response.status === 422) {
-        let shouldRetry = false;
-        try {
-          const errJson = JSON.parse(errText);
-          const errors = errJson.errors || [];
-          for (const errItem of errors) {
-            const existingCatId = errItem.metadata?.existingCategoryId;
-            const existingProdId = errItem.metadata?.existingProductId || errItem.metadata?.productId;
-            const missingParamIds = errItem.metadata?.missingParameterIds ? String(errItem.metadata.missingParameterIds).split(",") : [];
-            const paramMismatchId = errItem.metadata?.parameterId;
-            const expectedParamVal = errItem.metadata?.expectedParameterValue;
+      try {
+        const errJson = JSON.parse(errText);
+        const errors = errJson.errors || [];
+        for (const errItem of errors) {
+          const existingCatId = errItem.metadata?.existingCategoryId;
+          const existingProdId = errItem.metadata?.existingProductId || errItem.metadata?.productId;
+          const missingParamIds = errItem.metadata?.missingParameterIds ? String(errItem.metadata.missingParameterIds).split(",") : [];
+          const paramMismatchId = errItem.metadata?.parameterId;
+          const expectedParamVal = errItem.metadata?.expectedParameterValue;
 
-            if (existingCatId || existingProdId) {
-              if (existingCatId) {
-                payload.category = { id: existingCatId };
-                if (payload.productSet?.[0]?.product?.category) {
-                  payload.productSet[0].product.category = { id: existingCatId };
-                }
+          if (existingCatId || existingProdId) {
+            if (existingCatId) {
+              payload.category = { id: existingCatId };
+              if (payload.productSet?.[0]?.product?.category) {
+                payload.productSet[0].product.category = { id: existingCatId };
               }
-              if (existingProdId) {
-                payload.productSet = [{ product: { id: existingProdId } }];
-              }
+            }
+            if (existingProdId) {
+              payload.productSet = [{ product: { id: existingProdId } }];
+            }
+            shouldRetry = true;
+          }
+
+          if (paramMismatchId && expectedParamVal && payload.productSet?.[0]?.product?.parameters) {
+            const pIdx = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === paramMismatchId);
+            if (pIdx !== -1) {
+              payload.productSet[0].product.parameters[pIdx].values = [expectedParamVal];
+            } else {
+              payload.productSet[0].product.parameters.push({ id: paramMismatchId, values: [expectedParamVal] });
+            }
+            shouldRetry = true;
+          }
+
+          // Handle ParameterIdNotFoundException (unsupported parameter in category)
+          if (errItem.code === "ParameterIdNotFoundException" || errItem.message?.includes("not found in the category") || errItem.userMessage?.includes("not found in the category")) {
+            const notFoundId = errItem.metadata?.parameterId || (errItem.userMessage || "").match(/Parameter with ID (\d+) not found/i)?.[1] || (errItem.message || "").match(/Parameter with ID (\d+) not found/i)?.[1];
+            if (notFoundId && payload.productSet?.[0]?.product?.parameters) {
+              payload.productSet[0].product.parameters = payload.productSet[0].product.parameters.filter((p: any) => p.id !== notFoundId);
               shouldRetry = true;
             }
+          }
 
-            if (paramMismatchId && expectedParamVal && payload.productSet?.[0]?.product?.parameters) {
-              const pIdx = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === paramMismatchId);
-              if (pIdx !== -1) {
-                payload.productSet[0].product.parameters[pIdx].values = [expectedParamVal];
-              } else {
-                payload.productSet[0].product.parameters.push({ id: paramMismatchId, values: [expectedParamVal] });
-              }
-              shouldRetry = true;
+          // Extract correct EAN if Allegro explicitly tells us the required value in message
+          const correctValMatch = (errItem.message || "").match(/(?:The correct parameter value for the product is|Prawidłowa wartość parametru dla produktu to):\s*"([^"]+)"/i)
+            || (errItem.userMessage || "").match(/(?:The correct parameter value for the product is|Prawidłowa wartość parametru dla produktu to):\s*"([^"]+)"/i);
+          if (correctValMatch && payload.productSet?.[0]?.product?.parameters) {
+            const correctVal = correctValMatch[1];
+            const eanIdx = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === "225693");
+            if (eanIdx !== -1) {
+              payload.productSet[0].product.parameters[eanIdx].values = [correctVal];
+            } else {
+              payload.productSet[0].product.parameters.push({ id: "225693", values: [correctVal] });
             }
+            shouldRetry = true;
+          }
 
-            // Extract correct EAN if Allegro explicitly tells us the required value in message
-            const correctValMatch = (errItem.message || "").match(/(?:The correct parameter value for the product is|Prawidłowa wartość parametru dla produktu to):\s*"([^"]+)"/i)
-              || (errItem.userMessage || "").match(/(?:The correct parameter value for the product is|Prawidłowa wartość parametru dla produktu to):\s*"([^"]+)"/i);
-            if (correctValMatch && payload.productSet?.[0]?.product?.parameters) {
-              const correctVal = correctValMatch[1];
-              const eanIdx = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === "225693");
-              if (eanIdx !== -1) {
-                payload.productSet[0].product.parameters[eanIdx].values = [correctVal];
-              } else {
-                payload.productSet[0].product.parameters.push({ id: "225693", values: [correctVal] });
-              }
-              shouldRetry = true;
-            }
-
-            if (missingParamIds.length > 0 && payload.productSet?.[0]?.product?.parameters) {
-              for (const pId of missingParamIds) {
-                const trimmedPId = pId.trim();
-                const existingIndex = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === trimmedPId);
-                if (existingIndex === -1) {
-                  if (trimmedPId === "248580") {
-                    let rodzajId = "248580_931707";
-                    let rodzajVal = "inny";
-                    if (/chleb|toast|toust/i.test(params.titlePl)) {
-                      rodzajId = "248580_931703";
-                      rodzajVal = "chleb";
-                    } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt|bagel/i.test(params.titlePl)) {
-                      rodzajId = "248580_931704";
-                      rodzajVal = "bułka";
-                    }
-                    payload.productSet[0].product.parameters.push({
-                      id: "248580",
-                      valuesIds: [rodzajId],
-                      values: [rodzajVal],
-                    });
-                    shouldRetry = true;
-                  } else if (trimmedPId === "248572") {
-                    payload.productSet[0].product.parameters.push({
-                      id: "248572",
-                      valuesIds: ["248572_930593"],
-                      values: ["inny"],
-                    });
-                    shouldRetry = true;
-                  } else if (trimmedPId === "221929") {
-                    payload.productSet[0].product.parameters.push({
-                      id: "221929",
-                      values: [weight || "200"],
-                    });
-                    shouldRetry = true;
-                  } else if (trimmedPId === "221905") {
-                    payload.productSet[0].product.parameters.push({
-                      id: "221905",
-                      values: [weight || "200"],
-                    });
-                    shouldRetry = true;
+          if (missingParamIds.length > 0 && payload.productSet?.[0]?.product?.parameters) {
+            for (const pId of missingParamIds) {
+              const trimmedPId = pId.trim();
+              const existingIndex = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === trimmedPId);
+              if (existingIndex === -1) {
+                if (trimmedPId === "248580") {
+                  let rodzajId = "248580_931707";
+                  let rodzajVal = "inny";
+                  if (/chleb|toast|toust/i.test(params.titlePl)) {
+                    rodzajId = "248580_931703";
+                    rodzajVal = "chleb";
+                  } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt|bagel/i.test(params.titlePl)) {
+                    rodzajId = "248580_931704";
+                    rodzajVal = "bułka";
                   }
+                  payload.productSet[0].product.parameters.push({
+                    id: "248580",
+                    valuesIds: [rodzajId],
+                    values: [rodzajVal],
+                  });
+                  shouldRetry = true;
+                } else if (trimmedPId === "248572") {
+                  payload.productSet[0].product.parameters.push({
+                    id: "248572",
+                    valuesIds: ["248572_930593"],
+                    values: ["inny"],
+                  });
+                  shouldRetry = true;
+                } else if (trimmedPId === "221929") {
+                  payload.productSet[0].product.parameters.push({
+                    id: "221929",
+                    values: [weight || "200"],
+                  });
+                  shouldRetry = true;
+                } else if (trimmedPId === "221905") {
+                  payload.productSet[0].product.parameters.push({
+                    id: "221905",
+                    values: [weight || "200"],
+                  });
+                  shouldRetry = true;
+                } else if (trimmedPId === "244509") {
+                  payload.productSet[0].product.parameters.push({
+                    id: "244509",
+                    values: [params.titlePl.substring(0, 75)],
+                  });
+                  shouldRetry = true;
                 }
               }
             }
           }
-        } catch (parseErr) {
-          console.error("[Allegro] Error parsing 422 JSON:", parseErr);
         }
-
-        if (shouldRetry) {
-          console.log(`[Allegro] 🔄 Auto-healing 422 error. Retrying offer creation with updated payload:`, {
-            category: payload.category,
-            productSet: payload.productSet,
-          });
-
-          response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/vnd.allegro.public.v1+json",
-              "Content-Type": "application/vnd.allegro.public.v1+json",
-              "User-Agent": userAgent,
-            },
-            body: JSON.stringify(payload),
-          });
-
-          if (!response.ok && response.status !== 202 && response.status !== 201) {
-            errText = await response.text();
-          }
-        }
+      } catch (parseErr) {
+        console.error("[Allegro] Error parsing 422 JSON:", parseErr);
+        break;
       }
+
+      if (!shouldRetry) {
+        break;
+      }
+
+      retryCount++;
+      console.log(`[Allegro] 🔄 Auto-healing 422 error (attempt ${retryCount}). Retrying with updated payload:`, {
+        category: payload.category,
+        productSet: payload.productSet,
+      });
+
+      response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.allegro.public.v1+json",
+          "Content-Type": "application/vnd.allegro.public.v1+json",
+          "User-Agent": userAgent,
+        },
+        body: JSON.stringify(payload),
+      });
     }
 
     if (!response.ok && response.status !== 202 && response.status !== 201) {

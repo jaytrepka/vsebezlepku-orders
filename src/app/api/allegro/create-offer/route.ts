@@ -5,32 +5,32 @@ import { prisma } from "@/lib/prisma";
 export function detectAllegroCategory(url?: string, title?: string): string {
   const combined = `${url || ""} ${title || ""}`.toLowerCase();
 
-  // 1. Bread, buns, baguettes, rolls, toast, panini, wraps -> Pieczywo bezglutenowe (261421)
-  if (/chleb|baget|housk|pečiv|peciv|panini|ciabatt|burger|hamburg|toast|toust|bułk|bulk|wrap|tortill|piadin|focacc|korpus|hot dog|bulka|chleba/i.test(combined)) {
+  // 1. Bread, buns, baguettes, rolls, toast, panini, wraps, tortillas, bagels -> Pieczywo bezglutenowe (261421)
+  if (/chleb|baget|housk|pečiv|peciv|panini|ciabatt|burger|hamburg|toast|toust|bułk|bulk|wrap|tortill|piadin|focacc|korpus|hot dog|bulka|chleba|bagel|bajgiel/i.test(combined)) {
     return "261421"; // Pieczywo bezglutenowe
   }
 
-  // 2. Pasta, noodles, spaghetti, gnocchi -> Makarony bezglutenowe (261419)
-  if (/testovin|těstovin|makaron|spaghetti|penne|fusilli|tagliatelle|nudl|lasagn|farfalle|gnocchi|tortellin/i.test(combined)) {
-    return "261419"; // Makarony bezglutenowe
-  }
-
-  // 3. Flours, mixes, breadcrumbs, premixes -> Mąki i mieszanki bezglutenowe (261418)
-  if (/mouk|mąk|mak[ai]|směs|smes|mieszank|premix|strouhank|panierk|bułka tarta|krupic/i.test(combined)) {
-    return "261418"; // Mąki i mieszanki bezglutenowe
-  }
-
-  // 4. Sweets, snacks, biscuits, cakes, cookies, wafers -> Słodycze i przekąski bezglutenowe (261420)
-  if (/sladkost|sušenk|susenk|ciastk|herbatnik|wafl|baton|czekolad|čokolád|snack|chips|croissant|muffin|sfogli|pierniczk|perníčk|koláč|kolac|pernik|biscott/i.test(combined)) {
+  // 2. Sweets, snacks, biscuits, cakes, cookies, wafers, donuts, gingerbread, chocolate -> Słodycze i przekąski bezglutenowe (261420)
+  if (/sladkost|sušenk|susenk|ciastk|herbatnik|wafl|baton|czekolad|čokolád|snack|chips|croissant|muffin|sfogli|pierniczk|perníčk|koláč|kolac|pernik|biscott|donut/i.test(combined)) {
     return "261420"; // Słodycze i przekąski bezglutenowe
   }
 
-  // 5. Flakes, cereals, muesli, porridge -> 261422 (Płatki, musli i kasze bezglutenowe)
-  if (/vločk|vlock|płatk|platk|musli|muesli|granola|kaše|kase|kasz/i.test(combined)) {
-    return "261422"; // Płatki, musli i kasze bezglutenowe
+  // 3. Flours, mixes, breadcrumbs, pasta, cereals, flakes, granola, musli, porridge -> Produkty sypkie bezglutenowe (261417)
+  if (/mouk|mąk|mak[ai]|směs|smes|mieszank|premix|strouhank|panierk|bułka tarta|krupic|vločk|vlock|płatk|platk|musli|muesli|granola|kaše|kase|kasz|cereálie|cerealie|testovin|těstovin|makaron|spaghetti|penne|fusilli|tagliatelle|nudl|lasagn|farfalle|gnocchi|tortellin/i.test(combined)) {
+    return "261417"; // Produkty sypkie (mąki, mieszanki, płatki, musli, granola, makarony)
   }
 
-  // Default fallback category (Słodycze i przekąski)
+  // 4. Drinks, beverages -> Napoje bezglutenowe (261418)
+  if (/nápoj|napoj|čaj|caj|juice|džus|dzus|káva|kava|mléko|mleko|smoothie/i.test(combined)) {
+    return "261418"; // Napoje
+  }
+
+  // 5. Ready meals, instant meals, soups -> Dania gotowe bezglutenowe (261419)
+  if (/hotové jídlo|hotove jidlo|polévk|polevk|danie gotowe/i.test(combined)) {
+    return "261419"; // Dania gotowe
+  }
+
+  // Default fallback category (Słodycze i przekąski bezglutenowe)
   return "261420";
 }
 
@@ -221,6 +221,22 @@ const czToPlDictionary: Array<[RegExp, string]> = [
   [/\bslané\b/gi, "solone"],
   [/\bsladké\b/gi, "słodkie"],
   
+  // Cereals & Breakfast
+  [/\bgranola\b/gi, "granola"],
+  [/\bcereálie\b/gi, "płatki śniadaniowe"],
+  [/\bkaše\b/gi, "kaszka"],
+  [/\bpohanková\b/gi, "gryczana"],
+  [/\bjáhlová\b/gi, "jaglana"],
+  [/\bryžová\b/gi, "ryżowa"],
+  [/\bovesné\b/gi, "owsiane"],
+  [/\bovesná\b/gi, "owsiana"],
+  [/\bs červeným ovocem\b/gi, "z czerwonymi owocami"],
+  [/\bčerveným ovocem\b/gi, "czerwonymi owocami"],
+  [/\bčervené ovoce\b/gi, "czerwone owoce"],
+  [/\bčervené\b/gi, "czerwone"],
+  [/\bčervená\b/gi, "czerwona"],
+  [/\bčervený\b/gi, "czerwony"],
+
   // Units & Package
   [/\bvánoční perníčky\b/gi, "świąteczne pierniczki"],
   [/\bvánoční\b/gi, "świąteczne"],
@@ -548,6 +564,7 @@ export async function POST(request: NextRequest) {
       else if (/ciabatt/i.test(textToMatch)) finalEan = "8028169209227";
       else if (/baget|bagiet/i.test(urlSlug) || /baget|bagiet/i.test(scrapedData.productName || "")) finalEan = "8028169209203";
       else if (/pan-carre|toust|toast/i.test(textToMatch)) finalEan = "8028169209197";
+      else if (finalProductCode === "CO18" || /granola/i.test(textToMatch)) finalEan = "8028169208213";
       else if (/farfalle/i.test(textToMatch)) finalEan = "8028169002019";
       else if (/bbq/i.test(textToMatch)) finalEan = "8028169002231";
       else {
