@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!createResult.success) {
-      return NextResponse.json({ error: createResult.error }, { status: 400 });
+      return NextResponse.json({ error: createResult.error, debug: (createResult as any).debug }, { status: 400 });
     }
 
     return NextResponse.json({

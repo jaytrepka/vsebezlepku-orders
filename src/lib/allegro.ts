@@ -548,7 +548,21 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
     if (!response.ok && response.status !== 202 && response.status !== 201) {
       const errText = await response.text();
       console.error(`[Allegro] Failed to create product-offer: ${response.status} - ${errText}`);
-      return { success: false, error: `Allegro API vrátilo status ${response.status}: ${errText}` };
+      return { 
+        success: false, 
+        error: `Allegro API vrátilo status ${response.status}: ${errText}`,
+        debug: {
+          endpoint: `${ALLEGRO_API_URL}/sale/product-offers`,
+          status: response.status,
+          catalogProductId,
+          payloadSummary: {
+            name: payload.name,
+            productSet: payload.productSet,
+            category: payload.category,
+            imagesCount: payload.images?.length,
+          }
+        }
+      };
     }
 
     const result = await response.json();
