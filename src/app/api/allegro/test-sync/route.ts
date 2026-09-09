@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       diagnostics.calculatedAllegroStock = Math.max(0, stockProduct.totalCount - 2);
     }
 
-    const offerId = dataA.offers?.[0]?.id || dataB.offers?.[0]?.id;
+    const offerId = dataA.offers?.[0]?.id;
     diagnostics.detectedOfferId = offerId;
 
     if (offerId && !dryRun && stockProduct) {

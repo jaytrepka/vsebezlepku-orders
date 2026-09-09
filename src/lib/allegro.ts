@@ -437,7 +437,7 @@ export interface CreateAllegroOfferParams {
 /**
  * Creates and lists a new offer on Allegro using POST /sale/product-offers
  */
-export async function createAllegroOffer(token: string, params: CreateAllegroOfferParams): Promise<{ success: boolean; offerId?: string; offerUrl?: string; error?: string }> {
+export async function createAllegroOffer(token: string, params: CreateAllegroOfferParams): Promise<{ success: boolean; offerId?: string; offerUrl?: string; error?: string; debug?: any }> {
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
 
   try {
