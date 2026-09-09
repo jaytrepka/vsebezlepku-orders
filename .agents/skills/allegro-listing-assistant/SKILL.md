@@ -71,7 +71,7 @@ Post the prepared payload to the listing endpoint:
 The endpoint automatically:
 1. Uploads high-res product photos to Allegro CDN (`https://upload.allegro.pl/sale/images`).
 2. Automatically assigns default templates & parameters:
-   - **Cennik dostawy**: `6a22fcad-c8c1-495e-9c98-0b4b16853589`
+   - **Cennik dostawy**: `6415265d-9c5a-4c2b-9fd5-59f64f402155` (CZ-CZ)
    - **Warunki zwrotów**: `2bba241d-b306-42bb-a91a-a1353fc9e2c2`
    - **Reklamacje**: `618157f7-2d10-4c6c-a976-79e3c39abe37`
    - **Lokalizacja**: Líbeznice, 25065, CZ

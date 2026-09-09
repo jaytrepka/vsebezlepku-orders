@@ -220,7 +220,7 @@ export async function updateAllegroOfferStock(token: string, offerId: string, qu
 export async function updateAllegroProductOffer(
   token: string,
   offerId: string,
-  updates: { stock?: number; status?: "ACTIVE" | "INACTIVE" }
+  updates: { stock?: number; status?: "ACTIVE" | "INACTIVE"; shippingRatesId?: string }
 ): Promise<boolean> {
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
 
@@ -231,6 +231,9 @@ export async function updateAllegroProductOffer(
     }
     if (updates.status) {
       body.publication = { status: updates.status };
+    }
+    if (updates.shippingRatesId) {
+      body.delivery = { shippingRates: { id: updates.shippingRatesId } };
     }
 
     const response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers/${offerId}`, {
@@ -562,7 +565,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       }
     }
 
-    const shippingRatesId = params.shippingRatesId || "6a22fcad-c8c1-495e-9c98-0b4b16853589";
+    const shippingRatesId = params.shippingRatesId || "6415265d-9c5a-4c2b-9fd5-59f64f402155"; // Cennik CZ-CZ
     const returnPolicyId = params.returnPolicyId || "2bba241d-b306-42bb-a91a-a1353fc9e2c2";
     const impliedWarrantyId = params.impliedWarrantyId || "618157f7-2d10-4c6c-a976-79e3c39abe37";
     const categoryId = params.categoryId || "261420"; // Wyroby cukiernicze / ciastka / pieczywo
