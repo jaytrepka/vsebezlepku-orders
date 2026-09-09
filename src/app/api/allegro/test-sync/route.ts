@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
     // 3. Find stock in DB
     const stockProduct = await prisma.stockProduct.findFirst({
       where: { OR: [{ code }, { productName: { contains: code } }] },
+      orderBy: { updatedAt: "desc" },
     });
     diagnostics.dbStockProduct = stockProduct;
 

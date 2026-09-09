@@ -70,14 +70,15 @@ Post the prepared payload to the listing endpoint:
 
 The endpoint automatically:
 1. Uploads high-res product photos to Allegro CDN (`https://upload.allegro.pl/sale/images`).
-2. Pulls template IDs:
+2. Automatically assigns default templates & parameters:
    - **Cennik dostawy**: `6a22fcad-c8c1-495e-9c98-0b4b16853589`
    - **Warunki zwrotów**: `2bba241d-b306-42bb-a91a-a1353fc9e2c2`
    - **Reklamacje**: `618157f7-2d10-4c6c-a976-79e3c39abe37`
-   - **Lokalizacja**: Bocanovice, 73991, CZ
-   - **Faktura**: VAT
+   - **Lokalizacja**: Líbeznice, 25065, CZ
+   - **Płatności**: `NO_INVOICE`
+   - **Wymagane parametry produktu**: Marka (`248811`), Waga (`221929`), Nazwa handlowa (`244509`), EAN (`225693`), Stan: Nowy (`11323`)
 3. Calculates stock buffer (`sklad - 2` from PostgreSQL DB).
-4. Creates the offer (`POST /sale/offers`), activates it, and returns the live offer link:
+4. Creates and activates the offer via Allegro REST API (`POST /sale/product-offers`), returning the live offer link:
    `https://allegro.pl/oferta/{offerId}`.
 
 ---

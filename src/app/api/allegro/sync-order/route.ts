@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
             { productName: item.productName },
           ],
         },
+        orderBy: { updatedAt: "desc" },
       });
 
       const totalCount = stockProduct?.totalCount ?? 0;

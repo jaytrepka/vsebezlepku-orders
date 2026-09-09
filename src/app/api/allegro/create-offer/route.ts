@@ -52,7 +52,7 @@ function extractFromHtml(html: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { url, pricePln, titlePl, descriptionHtml, categoryId, productCode: customCode, stock: customStock, imageUrls: customImages } = body;
+    const { url, pricePln, titlePl, descriptionHtml, categoryId, productCode: customCode, stock: customStock, imageUrls: customImages, ean: customEan, brand: customBrand, weightGrams: customWeight } = body;
 
     if (!pricePln || isNaN(parseFloat(pricePln))) {
       return NextResponse.json({ error: "Cena v PLN (pricePln) je povinná" }, { status: 400 });
@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
     const finalTitle = titlePl || scrapedData.productName || "Bezglutenowy produkt";
     const finalImages = customImages && customImages.length > 0 ? customImages : (scrapedData.imageUrls || []);
     const finalDescription = descriptionHtml || scrapedData.descriptionHtml || `<p>${finalTitle}</p>`;
+    const finalEan = customEan || scrapedData.ean || (finalProductCode === "S064" ? "8028169209531" : undefined);
 
     // Determine stock
     let stockCount = typeof customStock === "number" ? customStock : null;
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
             ...(scrapedData.productName ? [{ productName: scrapedData.productName }] : []),
           ],
         },
+        orderBy: { updatedAt: "desc" },
       });
       if (dbProduct) {
         stockCount = Math.max(0, dbProduct.totalCount - 2);
@@ -112,7 +114,9 @@ export async function POST(request: NextRequest) {
       imageUrls: finalImages,
       descriptionHtml: finalDescription,
       categoryId: categoryId || "261420",
-      ean: scrapedData.ean,
+      ean: finalEan,
+      brand: customBrand,
+      weightGrams: customWeight,
     });
 
     if (!createResult.success) {

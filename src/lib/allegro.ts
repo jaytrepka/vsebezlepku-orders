@@ -217,10 +217,54 @@ export async function updateAllegroOfferStock(token: string, offerId: string, qu
   }
 }
 
+export async function updateAllegroProductOffer(
+  token: string,
+  offerId: string,
+  updates: { stock?: number; status?: "ACTIVE" | "INACTIVE" }
+): Promise<boolean> {
+  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+
+  try {
+    const body: any = {};
+    if (typeof updates.stock === "number") {
+      body.stock = { available: updates.stock, unit: "UNIT" };
+    }
+    if (updates.status) {
+      body.publication = { status: updates.status };
+    }
+
+    const response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers/${offerId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.allegro.public.v1+json",
+        "Content-Type": "application/vnd.allegro.public.v1+json",
+        "User-Agent": userAgent,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok && response.status !== 202) {
+      const err = await response.text();
+      console.error(`[Allegro] Failed to patch product-offer ${offerId}: ${response.status} - ${err}`);
+      return false;
+    }
+
+    console.log(`[Allegro] ✅ Product-offer ${offerId} úspěšně aktualizován přes PATCH:`, updates);
+    return true;
+  } catch (err) {
+    console.error(`[Allegro] Error patching product-offer ${offerId}:`, err);
+    return false;
+  }
+}
+
 /**
  * Activates / resumes an offer on Allegro when stock is positive (> 0)
  */
 export async function activateAllegroOffer(token: string, offerId: string): Promise<boolean> {
+  const patched = await updateAllegroProductOffer(token, offerId, { status: "ACTIVE" });
+  if (patched) return true;
+
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
   const commandId = crypto.randomUUID();
 
@@ -429,9 +473,75 @@ export interface CreateAllegroOfferParams {
   descriptionHtml?: string;
   categoryId?: string;
   ean?: string;
+  brand?: string;
+  weightGrams?: string | number;
   shippingRatesId?: string;
   returnPolicyId?: string;
   impliedWarrantyId?: string;
+}
+
+export function sanitizeAllegroDescriptionHtml(rawHtml: string): string {
+  if (!rawHtml) return "<p>Produkt bezglutenowy</p>";
+
+  // 1. Pre-process common inline formatting
+  let clean = rawHtml
+    .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "<b>$1</b>")
+    .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "<b>$1</b>")
+    .replace(/<b\s+[^>]*>/gi, "<b>")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<th[^>]*>([\s\S]*?)<\/th>/gi, "<b>$1: </b>")
+    .replace(/<td[^>]*>([\s\S]*?)<\/td>/gi, " $1 ");
+
+  // 2. Extract h1 / h2 if present
+  clean = clean
+    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n__H1__$1__H1__\n")
+    .replace(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>/gi, "\n__H2__$1__H2__\n");
+
+  // 3. Strip all other HTML tags except <b> and </b>
+  clean = clean.replace(/<(?!\/?b\b)[^>]+>/gi, "");
+
+  // 4. Decode common HTML entities
+  clean = clean
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+
+  // 5. Split by newlines, trim and rebuild clean HTML blocks
+  const lines = clean
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const sections: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith("__H1__") && line.endsWith("__H1__")) {
+      const content = line.replace(/__H1__/g, "").trim();
+      if (content) sections.push(`<h1>${content}</h1>`);
+    } else if (line.startsWith("__H2__") && line.endsWith("__H2__")) {
+      const content = line.replace(/__H2__/g, "").trim();
+      if (content) sections.push(`<h2>${content}</h2>`);
+    } else {
+      // Clean up stray/unbalanced <b> tags within line
+      const bOpenCount = (line.match(/<b>/gi) || []).length;
+      const bCloseCount = (line.match(/<\/b>/gi) || []).length;
+      let safeLine = line;
+      if (bOpenCount > bCloseCount) {
+        safeLine += "</b>".repeat(bOpenCount - bCloseCount);
+      } else if (bCloseCount > bOpenCount) {
+        safeLine = "<b>".repeat(bCloseCount - bOpenCount) + safeLine;
+      }
+      sections.push(`<p>${safeLine}</p>`);
+    }
+  }
+
+  return sections.join("\n") || "<p>Produkt bezglutenowy</p>";
 }
 
 /**
@@ -457,11 +567,53 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
     const impliedWarrantyId = params.impliedWarrantyId || "618157f7-2d10-4c6c-a976-79e3c39abe37";
     const categoryId = params.categoryId || "261420"; // Wyroby cukiernicze / ciastka / pieczywo
 
-    // Clean description HTML
-    const descriptionContent = params.descriptionHtml || `<p>${params.titlePl}</p>`;
+    // Clean and sanitize description HTML to comply strictly with Allegro standards
+    const descriptionContent = sanitizeAllegroDescriptionHtml(params.descriptionHtml || `<p>${params.titlePl}</p>`);
 
     // Check if product exists in Allegro Catalog
     const catalogProductId = await searchAllegroCatalog(token, params.titlePl, params.ean);
+
+    // Extract weight in grams from title if not specified
+    let weight = params.weightGrams ? String(params.weightGrams) : undefined;
+    if (!weight) {
+      const weightMatch = params.titlePl.match(/(\d+)\s*g\b/i);
+      if (weightMatch) {
+        weight = weightMatch[1];
+      }
+    }
+
+    // Determine brand
+    let brand = params.brand;
+    let brandValueId: string | undefined = undefined;
+    if (!brand) {
+      if (/piaceri mediterranei/i.test(params.titlePl)) {
+        brand = "Piaceri Mediterranei";
+        brandValueId = "248811_1963110";
+      } else if (/nutrifree/i.test(params.titlePl)) {
+        brand = "Nutrifree";
+      } else if (/schar|schär/i.test(params.titlePl)) {
+        brand = "Schär";
+      } else {
+        brand = "Piaceri Mediterranei";
+        brandValueId = "248811_1963110";
+      }
+    }
+
+    const productParameters: any[] = [];
+    if (params.ean) {
+      productParameters.push({ id: "225693", values: [params.ean] });
+    }
+    if (brand) {
+      productParameters.push({
+        id: "248811",
+        values: [brand],
+        ...(brandValueId ? { valuesIds: [brandValueId] } : {}),
+      });
+    }
+    if (weight) {
+      productParameters.push({ id: "221929", values: [weight] });
+    }
+    productParameters.push({ id: "244509", values: [params.titlePl.substring(0, 75)] });
 
     const productSet = catalogProductId
       ? [{ product: { id: catalogProductId } }]
@@ -470,11 +622,8 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
             product: {
               name: params.titlePl.substring(0, 75),
               category: { id: categoryId },
-              images: uploadedImages.map((url) => ({ url })),
-              parameters: [
-                { id: "11323", values: ["Nowy"] }, // Stan: Nowy
-                ...(params.ean ? [{ id: "225693", values: [params.ean] }] : []),
-              ],
+              images: uploadedImages, // array of string URLs
+              parameters: productParameters,
             },
           },
         ];
@@ -483,7 +632,10 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       name: params.titlePl.substring(0, 75),
       productSet,
       category: { id: categoryId },
-      images: uploadedImages.map((url) => ({ url })),
+      parameters: [
+        { id: "11323", valuesIds: ["11323_1"] }, // Stan: Nowy
+      ],
+      images: uploadedImages, // array of strings
       sellingMode: {
         format: "BUY_NOW",
         price: {
@@ -497,25 +649,22 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       },
       publication: {
         status: params.stockCount > 0 ? "ACTIVE" : "INACTIVE",
-        marketplaces: {
-          base: { id: "allegro-pl" },
-        },
       },
       delivery: {
         shippingRates: { id: shippingRatesId },
-        handlingTime: "PT24H",
+        handlingTime: "PT0S",
       },
       afterSalesServices: {
         returnPolicy: { id: returnPolicyId },
         impliedWarranty: { id: impliedWarrantyId },
       },
       payments: {
-        invoice: "VAT",
+        invoice: "NO_INVOICE",
       },
       location: {
         countryCode: "CZ",
-        postCode: "73991",
-        city: "Bocanovice",
+        postCode: "25065",
+        city: "Líbeznice",
       },
       description: {
         sections: [
