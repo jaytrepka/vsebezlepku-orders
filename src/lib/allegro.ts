@@ -770,8 +770,10 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
           const errors = errJson.errors || [];
           for (const errItem of errors) {
             const existingCatId = errItem.metadata?.existingCategoryId;
-            const existingProdId = errItem.metadata?.existingProductId;
+            const existingProdId = errItem.metadata?.existingProductId || errItem.metadata?.productId;
             const missingParamIds = errItem.metadata?.missingParameterIds ? String(errItem.metadata.missingParameterIds).split(",") : [];
+            const paramMismatchId = errItem.metadata?.parameterId;
+            const expectedParamVal = errItem.metadata?.expectedParameterValue;
 
             if (existingCatId || existingProdId) {
               if (existingCatId) {
@@ -782,6 +784,16 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
               }
               if (existingProdId) {
                 payload.productSet = [{ product: { id: existingProdId } }];
+              }
+              shouldRetry = true;
+            }
+
+            if (paramMismatchId && expectedParamVal && payload.productSet?.[0]?.product?.parameters) {
+              const pIdx = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === paramMismatchId);
+              if (pIdx !== -1) {
+                payload.productSet[0].product.parameters[pIdx].values = [expectedParamVal];
+              } else {
+                payload.productSet[0].product.parameters.push({ id: paramMismatchId, values: [expectedParamVal] });
               }
               shouldRetry = true;
             }
@@ -814,16 +826,16 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
                       values: ["inny"],
                     });
                     shouldRetry = true;
-                  } else if (trimmedPId === "221929" && weight) {
+                  } else if (trimmedPId === "221929") {
                     payload.productSet[0].product.parameters.push({
                       id: "221929",
-                      values: [weight],
+                      values: [weight || "200"],
                     });
                     shouldRetry = true;
-                  } else if (trimmedPId === "221905" && weight) {
+                  } else if (trimmedPId === "221905") {
                     payload.productSet[0].product.parameters.push({
                       id: "221905",
-                      values: [weight],
+                      values: [weight || "200"],
                     });
                     shouldRetry = true;
                   }
