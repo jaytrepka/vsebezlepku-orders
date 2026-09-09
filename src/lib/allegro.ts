@@ -651,7 +651,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       if (/chleb|toast|toust/i.test(params.titlePl)) {
         rodzajId = "248580_931703"; // chleb
         rodzajValue = "chleb";
-      } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt/i.test(params.titlePl)) {
+      } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt|bagel/i.test(params.titlePl)) {
         rodzajId = "248580_931704"; // bułka
         rodzajValue = "bułka";
       } else if (/tortill|wrap|piadin/i.test(params.titlePl)) {
@@ -798,6 +798,20 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
               shouldRetry = true;
             }
 
+            // Extract correct EAN if Allegro explicitly tells us the required value in message
+            const correctValMatch = (errItem.message || "").match(/(?:The correct parameter value for the product is|Prawidłowa wartość parametru dla produktu to):\s*"([^"]+)"/i)
+              || (errItem.userMessage || "").match(/(?:The correct parameter value for the product is|Prawidłowa wartość parametru dla produktu to):\s*"([^"]+)"/i);
+            if (correctValMatch && payload.productSet?.[0]?.product?.parameters) {
+              const correctVal = correctValMatch[1];
+              const eanIdx = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === "225693");
+              if (eanIdx !== -1) {
+                payload.productSet[0].product.parameters[eanIdx].values = [correctVal];
+              } else {
+                payload.productSet[0].product.parameters.push({ id: "225693", values: [correctVal] });
+              }
+              shouldRetry = true;
+            }
+
             if (missingParamIds.length > 0 && payload.productSet?.[0]?.product?.parameters) {
               for (const pId of missingParamIds) {
                 const trimmedPId = pId.trim();
@@ -809,7 +823,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
                     if (/chleb|toast|toust/i.test(params.titlePl)) {
                       rodzajId = "248580_931703";
                       rodzajVal = "chleb";
-                    } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt/i.test(params.titlePl)) {
+                    } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt|bagel/i.test(params.titlePl)) {
                       rodzajId = "248580_931704";
                       rodzajVal = "bułka";
                     }

@@ -148,6 +148,14 @@ const czToPlDictionary: Array<[RegExp, string]> = [
   [/\bhouska\b/gi, "bułka"],
   [/\bchléb\b/gi, "chleb"],
   [/\bchleba\b/gi, "chleb"],
+  [/\bbagel\b/gi, "bajgiel"],
+  [/\bbagely\b/gi, "bajgle"],
+  [/\bhamburgerové housky\b/gi, "bułki do hamburgerów"],
+  [/\bhamburgerové\b/gi, "do hamburgerów"],
+  [/\bhamburgerová\b/gi, "do hamburgera"],
+  [/\blívance\b/gi, "racuchy"],
+  [/\blívanec\b/gi, "racuch"],
+  [/\bhotové lívance\b/gi, "gotowe racuchy"],
   [/\btěstoviny\b/gi, "makaron"],
   [/\btěstovina\b/gi, "makaron"],
   [/\bknedlíky\b/gi, "knedle"],
@@ -524,20 +532,24 @@ export async function POST(request: NextRequest) {
     // 4. Determine EAN
     let finalEan = customEan || scrapedData.ean;
     if (!finalEan) {
-      if (finalProductCode === "D187" || /livance|pancake/i.test(url || "")) finalEan = "8028169206189";
-      else if (finalProductCode === "D186" || finalProductCode === "1043" || /donut.*ruzov|donuts.*pink/i.test(url || "")) finalEan = "8028169207254";
-      else if (finalProductCode === "D136" || /donut.*pistac/i.test(url || "")) finalEan = "8028169207261";
-      else if (/donut.*bil|donuts.*white/i.test(url || "")) finalEan = "8028169207230";
-      else if (/donut.*orisk|donuts.*hazelnut/i.test(url || "")) finalEan = "8028169207247";
-      else if (finalProductCode === "S064" || /linecke/i.test(url || "")) finalEan = "8028169209531";
-      else if (finalProductCode === "S063" || /pernicky|pan-di-zenzero/i.test(url || "")) finalEan = "8028169209395";
-      else if (finalProductCode === "781" || /hamburger/i.test(url || "")) finalEan = "8028169209210";
-      else if (/piadina/i.test(url || "")) finalEan = "8028169209241";
-      else if (/ciabatta/i.test(url || "")) finalEan = "8028169209227";
-      else if (/baget/i.test(url || "")) finalEan = "8028169209203";
-      else if (/pan-carre|toust/i.test(url || "")) finalEan = "8028169209197";
-      else if (/farfalle/i.test(url || "")) finalEan = "8028169002019";
-      else if (/bbq/i.test(url || "")) finalEan = "8028169002231";
+      const urlSlug = url ? url.split("/").filter(Boolean).pop() || "" : "";
+      const textToMatch = `${finalProductCode} ${urlSlug} ${scrapedData.productName || ""} ${finalTitle || ""}`.toLowerCase();
+
+      if (finalProductCode === "D187" || /livance|pancake/i.test(textToMatch)) finalEan = "8028169206189";
+      else if (finalProductCode === "D186" || finalProductCode === "1043" || /donut.*(ruzov|pink|różow)/i.test(textToMatch)) finalEan = "8028169207254";
+      else if (finalProductCode === "D136" || /donut.*(pistac)/i.test(textToMatch)) finalEan = "8028169207261";
+      else if (/donut.*(bil|white|biał)/i.test(textToMatch)) finalEan = "8028169207230";
+      else if (/donut.*(orisk|hazelnut|orzech)/i.test(textToMatch)) finalEan = "8028169207247";
+      else if (finalProductCode === "S064" || /lineck/i.test(textToMatch)) finalEan = "8028169209531";
+      else if (finalProductCode === "S063" || /pernick|pan-di-zenzero|piernicz/i.test(textToMatch)) finalEan = "8028169209395";
+      else if (finalProductCode === "781" || /hamburger/i.test(textToMatch)) finalEan = "8028169209210";
+      else if (/bagel|bajgiel/i.test(textToMatch)) finalEan = "8028169209234";
+      else if (/piadin/i.test(textToMatch)) finalEan = "8028169209241";
+      else if (/ciabatt/i.test(textToMatch)) finalEan = "8028169209227";
+      else if (/baget|bagiet/i.test(urlSlug) || /baget|bagiet/i.test(scrapedData.productName || "")) finalEan = "8028169209203";
+      else if (/pan-carre|toust|toast/i.test(textToMatch)) finalEan = "8028169209197";
+      else if (/farfalle/i.test(textToMatch)) finalEan = "8028169002019";
+      else if (/bbq/i.test(textToMatch)) finalEan = "8028169002231";
       else {
         finalEan = generateValidEan13(finalProductCode || url || finalTitle);
       }
