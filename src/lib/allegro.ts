@@ -618,6 +618,41 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
     }
     productParameters.push({ id: "244509", values: [params.titlePl.substring(0, 75)] });
 
+    // Category-specific required parameters
+    if (categoryId === "261421") {
+      // Pieczywo bezglutenowe -> Rodzaj (248580)
+      let rodzajId = "248580_931707"; // inny
+      let rodzajValue = "inny";
+      if (/chleb|toast|toust/i.test(params.titlePl)) {
+        rodzajId = "248580_931703"; // chleb
+        rodzajValue = "chleb";
+      } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt/i.test(params.titlePl)) {
+        rodzajId = "248580_931704"; // bułka
+        rodzajValue = "bułka";
+      } else if (/tortill|wrap|piadin/i.test(params.titlePl)) {
+        rodzajId = "248580_931705"; // tortilla
+        rodzajValue = "tortilla";
+      } else if (/rogalik|croissant/i.test(params.titlePl)) {
+        rodzajId = "248580_931706"; // rogalik
+        rodzajValue = "rogalik";
+      }
+      productParameters.push({
+        id: "248580",
+        valuesIds: [rodzajId],
+        values: [rodzajValue],
+      });
+    } else if (categoryId === "261418") {
+      // Mąki i mieszanki bezglutenowe -> Rodzaj (248572) & Pojemność (221905)
+      productParameters.push({
+        id: "248572",
+        valuesIds: ["248572_930593"],
+        values: ["inny"],
+      });
+      if (weight) {
+        productParameters.push({ id: "221905", values: [weight] });
+      }
+    }
+
     const productSet = catalogProductId
       ? [{ product: { id: catalogProductId } }]
       : [
@@ -702,7 +737,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       errText = await response.text();
       console.warn(`[Allegro] Initial offer creation returned status ${response.status}: ${errText}`);
 
-      // Auto-healing for 422 errors (CATEGORY_MISMATCH, existing catalog product match, etc.)
+      // Auto-healing for 422 errors (CATEGORY_MISMATCH, existing catalog product match, missing parameters, etc.)
       if (response.status === 422) {
         let shouldRetry = false;
         try {
@@ -711,6 +746,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
           for (const errItem of errors) {
             const existingCatId = errItem.metadata?.existingCategoryId;
             const existingProdId = errItem.metadata?.existingProductId;
+            const missingParamIds = errItem.metadata?.missingParameterIds ? String(errItem.metadata.missingParameterIds).split(",") : [];
 
             if (existingCatId || existingProdId) {
               if (existingCatId) {
@@ -723,7 +759,51 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
                 payload.productSet = [{ product: { id: existingProdId } }];
               }
               shouldRetry = true;
-              break;
+            }
+
+            if (missingParamIds.length > 0 && payload.productSet?.[0]?.product?.parameters) {
+              for (const pId of missingParamIds) {
+                const trimmedPId = pId.trim();
+                const existingIndex = payload.productSet[0].product.parameters.findIndex((p: any) => p.id === trimmedPId);
+                if (existingIndex === -1) {
+                  if (trimmedPId === "248580") {
+                    let rodzajId = "248580_931707";
+                    let rodzajVal = "inny";
+                    if (/chleb|toast|toust/i.test(params.titlePl)) {
+                      rodzajId = "248580_931703";
+                      rodzajVal = "chleb";
+                    } else if (/bułk|bulk|housk|baget|burger|hamburg|panini|ciabatt/i.test(params.titlePl)) {
+                      rodzajId = "248580_931704";
+                      rodzajVal = "bułka";
+                    }
+                    payload.productSet[0].product.parameters.push({
+                      id: "248580",
+                      valuesIds: [rodzajId],
+                      values: [rodzajVal],
+                    });
+                    shouldRetry = true;
+                  } else if (trimmedPId === "248572") {
+                    payload.productSet[0].product.parameters.push({
+                      id: "248572",
+                      valuesIds: ["248572_930593"],
+                      values: ["inny"],
+                    });
+                    shouldRetry = true;
+                  } else if (trimmedPId === "221929" && weight) {
+                    payload.productSet[0].product.parameters.push({
+                      id: "221929",
+                      values: [weight],
+                    });
+                    shouldRetry = true;
+                  } else if (trimmedPId === "221905" && weight) {
+                    payload.productSet[0].product.parameters.push({
+                      id: "221905",
+                      values: [weight],
+                    });
+                    shouldRetry = true;
+                  }
+                }
+              }
             }
           }
         } catch (parseErr) {
@@ -731,7 +811,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
         }
 
         if (shouldRetry) {
-          console.log(`[Allegro] 🔄 Auto-healing 422 CATEGORY_MISMATCH / existing product. Retrying offer creation with updated payload:`, {
+          console.log(`[Allegro] 🔄 Auto-healing 422 error. Retrying offer creation with updated payload:`, {
             category: payload.category,
             productSet: payload.productSet,
           });
