@@ -342,3 +342,164 @@ export async function syncOrderItemsToAllegro(items: { productCode?: string | nu
     }
   }
 }
+
+/**
+ * Uploads an image by URL to Allegro's image hosting (https://upload.allegro.pl/sale/images)
+ */
+export async function uploadAllegroImage(token: string, imageUrl: string): Promise<string | null> {
+  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+
+  try {
+    const response = await fetch("https://upload.allegro.pl/sale/images", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.allegro.public.v1+json",
+        "Content-Type": "application/vnd.allegro.public.v1+json",
+        "User-Agent": userAgent,
+      },
+      body: JSON.stringify({ url: imageUrl }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error(`[Allegro] Failed to upload image ${imageUrl}: ${response.status} - ${err}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.location || null;
+  } catch (err) {
+    console.error(`[Allegro] Error uploading image ${imageUrl}:`, err);
+    return null;
+  }
+}
+
+export interface CreateAllegroOfferParams {
+  titlePl: string;
+  productCode: string;
+  pricePln: number;
+  stockCount: number;
+  imageUrls: string[];
+  descriptionHtml?: string;
+  categoryId?: string;
+  ean?: string;
+  shippingRatesId?: string;
+  returnPolicyId?: string;
+  impliedWarrantyId?: string;
+}
+
+/**
+ * Creates and lists a new offer on Allegro using template settings
+ */
+export async function createAllegroOffer(token: string, params: CreateAllegroOfferParams): Promise<{ success: boolean; offerId?: string; offerUrl?: string; error?: string }> {
+  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+
+  try {
+    // 1. Upload images to Allegro image servers
+    const uploadedImages: string[] = [];
+    for (const imgUrl of params.imageUrls) {
+      if (imgUrl.includes("allegroimg.com")) {
+        uploadedImages.push(imgUrl);
+      } else {
+        const uploaded = await uploadAllegroImage(token, imgUrl);
+        if (uploaded) uploadedImages.push(uploaded);
+      }
+    }
+
+    if (uploadedImages.length === 0 && params.imageUrls.length > 0) {
+      console.warn("[Allegro] No images uploaded successfully, continuing with original URLs if any");
+    }
+
+    const shippingRatesId = params.shippingRatesId || "6a22fcad-c8c1-495e-9c98-0b4b16853589";
+    const returnPolicyId = params.returnPolicyId || "2bba241d-b306-42bb-a91a-a1353fc9e2c2";
+    const impliedWarrantyId = params.impliedWarrantyId || "618157f7-2d10-4c6c-a976-79e3c39abe37";
+    const categoryId = params.categoryId || "261420"; // Wyroby cukiernicze / ciastka / pieczywo
+
+    // Clean description HTML
+    const descriptionContent = params.descriptionHtml || `<p>${params.titlePl}</p>`;
+
+    const payload: any = {
+      name: params.titlePl.substring(0, 75),
+      category: { id: categoryId },
+      primaryImage: uploadedImages.length > 0 ? { url: uploadedImages[0] } : undefined,
+      images: uploadedImages.map((url) => ({ url })),
+      sellingMode: {
+        format: "BUY_NOW",
+        price: {
+          amount: params.pricePln.toFixed(2),
+          currency: "PLN",
+        },
+      },
+      stock: {
+        available: Math.max(0, params.stockCount),
+        unit: "UNIT",
+      },
+      publication: {
+        status: params.stockCount > 0 ? "ACTIVE" : "INACTIVE",
+        marketplaces: {
+          base: { id: "allegro-pl" },
+        },
+      },
+      delivery: {
+        shippingRates: { id: shippingRatesId },
+        handlingTime: "PT24H",
+      },
+      afterSalesServices: {
+        returnPolicy: { id: returnPolicyId },
+        impliedWarranty: { id: impliedWarrantyId },
+      },
+      payments: {
+        invoice: "VAT",
+      },
+      location: {
+        countryCode: "CZ",
+        postCode: "73991",
+        city: "Bocanovice",
+      },
+      description: {
+        sections: [
+          {
+            items: [
+              {
+                type: "TEXT",
+                content: descriptionContent,
+              },
+            ],
+          },
+        ],
+      },
+      external: {
+        id: params.productCode,
+      },
+    };
+
+    const response = await fetch(`${ALLEGRO_API_URL}/sale/offers`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.allegro.public.v1+json",
+        "Content-Type": "application/vnd.allegro.public.v1+json",
+        "User-Agent": userAgent,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[Allegro] Failed to create offer: ${response.status} - ${errText}`);
+      return { success: false, error: `Allegro API vrátilo status ${response.status}: ${errText}` };
+    }
+
+    const result = await response.json();
+    const offerId = result.id;
+    const offerUrl = `https://allegro.pl/oferta/${offerId}`;
+
+    console.log(`[Allegro] ✅ Vytvořena nová nabídka ${offerId}: ${offerUrl}`);
+    return { success: true, offerId, offerUrl };
+  } catch (err) {
+    console.error("[Allegro] Error creating offer:", err);
+    return { success: false, error: String(err) };
+  }
+}
+

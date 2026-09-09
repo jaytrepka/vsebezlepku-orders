@@ -1,66 +1,92 @@
 ---
 name: allegro-listing-assistant
 description: >-
-  Use this skill when preparing, translating, parameterizing, or syncing product listings from
-  Shoptet/XML to the Allegro marketplace (PL, CZ, SK, HU), using Base.com or Allegro REST API.
+  Use this skill when preparing, translating, parameterizing, listing, or syncing product listings from
+  vsebezlepku.cz URLs or Shoptet XML to the Allegro marketplace (PL, CZ, SK, HU) using Allegro REST API.
 ---
 
 # Allegro Listing & Marketplace Assistant for VšeBezLepku
 
-This skill guides the workflow for taking products from Shoptet / XML feed and listing them on **Allegro** across all target markets (Poland `PL`, Czech Republic `CZ`, Slovakia `SK`, and Hungary `HU`).
+This skill provides an automated workflow to list new gluten-free products directly onto **Allegro.pl** (with multi-market sync to `allegro.cz`, `allegro.sk`, and `allegro.hu`) given only a **product URL from `vsebezlepku.cz`** and a **price in PLN**.
 
 ---
 
-## 1. Multi-Market Strategy on Allegro
-Allegro translates listings to foreign domains (`allegro.cz`, `allegro.sk`, `allegro.hu`) automatically if the base offer on `allegro.pl` is structured properly with correct EANs and parameters.
+## 1. 1-Step Automated Listing Workflow
 
-### Critical Offer Attributes for Allegro Food & Gluten-Free:
-1. **Title (Polish / Pl):** Max 50–75 characters.
-   - Formula: `[Marka] + [Nazwa Produktu] + [Bezglutenowe / Bez Glutenu] + [Gramatura / Waga]`
-   - Example: `Piaceri Mediterranei Tortelloni Dyniowe Bezglutenowe 250g`
-2. **EAN / GTIN:** Required for catalog matching (*Produktyzacja*).
-3. **Kategoria (Category):**
-   - *Supermarket > Produkty spożywcze > Makarony > Bezglutenowe*
-   - *Supermarket > Produkty spożywcze > Pieczywo i wyroby cukiernicze*
-4. **Cechy dodatkowe (Attributes):**
-   - `Cechy dodatkowe`: `bezglutenowy` (crucial for filter visibility)
-   - `Stan`: `Nowy`
-   - `Waga netto`: e.g. `250 g`
-   - `Kraj pochodzenia`: `Włochy` (Italy)
+When the user asks to list a product by providing a **`vsebezlepku.cz` URL** and a **price in PLN**:
+
+### Step 1: Fetch & Inspect Product Page
+Use `read_url_content` on the provided `vsebezlepku.cz` URL to extract:
+1. **Product Name** (Czech, e.g. *Piaceri Mediterranei bezlepkové CROSTATINE MERUŇKOVÉ 200g*)
+2. **Product Code / SKU** (e.g. `BM06`, `733`, `D186`)
+3. **EAN / Barcode** (from schema.org / meta / description)
+4. **Product Images** (full-res image URLs)
+5. **Net Weight / Gramáž** (e.g. `200g`, `400g`)
+6. **Ingredients & Allergens** (Czech text)
+7. **Nutrition Facts** (Energetická hodnota, tuky, sacharidy, bílkoviny, sůl na 100g)
+8. **Brand** (e.g. `Piaceri Mediterranei`, `Massimo Zero`, `Nutrifree`, `Rummo`, `Caputo`)
 
 ---
 
-## 2. Base.com (BaseLinker) Workflow & Automation
+### Step 2: Generate Optimized Polish Listing Content
 
-### Current Manual Steps:
-1. Export product from Shoptet / import via Base.com.
-2. Select Allegro account.
-3. Map category and fill missing parameters (EAN, weight).
-4. Translate title and description to Polish.
-5. Publish offer on Allegro.pl.
+#### A. Polish Title (Max 75 characters, SEO-optimized):
+Formula: `[Marka] + [Nazwa Produktu po polsku] + [Bezglutenowe / Bez Glutenu] + [Waga]`
+*Examples:*
+- `Piaceri Mediterranei KOSZYCZKI Z MORELAMI Bezglutenowe 200g`
+- `Massimo Zero MAKARON FARFALLE Bezglutenowy Włoski 400g`
+- `Piaceri Mediterranei DONUTY PISTACJOWE Bezglutenowe 90g`
 
-### How to Automate:
-- **Base.com Automatic Actions:**
-  - Set default parameters for brands `Piaceri Mediterranei` and `Massimo Zero` (Country of Origin: Italy, Diet: Bezglutenowa).
-  - Use template tags in Base.com to auto-generate Polish titles.
-- **Allegro REST API Alternative:**
-  - Endpoints: `POST /sale/offers`, `PUT /sale/product-offers/{offerId}`
-  - Auth: OAuth 2.0 Bearer token.
-  - Can be scripted directly to read from Shoptet XML and publish to Allegro without Base.com manual clicking.
+#### B. Allegro Category Selection:
+- **`261420`**: Wyroby cukiernicze, ciastka, muffinki, donuty, babeczki, słodkie wypieki
+- **`260950`**: Makarony bezglutenowe, tortellini, gnocchi
+- **`260947`**: Mąki i mieszanki bezglutenowe do chleba/pizzy
+- **`261418`**: Przekąski, krakersy, paluszki chlebowe
 
----
-
-## 3. Stock Synchronization & Safety Buffer (-3 pieces)
-
-### Current Architecture:
-- `shoptet-stock-sync.js` (Tampermonkey) scrapes Shoptet stock -> Google Sheet (via Google Apps Script Web App).
-- `allegro-sync-userscript.js` (Tampermonkey) on `salescenter.allegro.com/my-assortment` reads Google Sheet:
-  - Calculation: `novyPocet = shoptetStock - 3` (safety buffer).
-  - If `novyPocet <= 0`: Closes the offer (`close-offer-btn`).
-  - If `novyPocet > 0`: Edits stock quantity input on Allegro and saves.
+#### C. Polish Description HTML (`description.sections`):
+Structure:
+1. **Nagłówek marketingowy** (włoska jakość, 100% bez glutenu, certyfikowane).
+2. **Składniki (Ingredients)**: Czech ingredients translated into natural Polish with **bolded allergens** (np. `mąka kukurydziana, cukier, **jaja**, masło (**mleko**)...`).
+3. **Wartości odżywcze w 100g**: Clean tabular or bulleted nutritional data.
+4. **Warunki przechowywania**: Przechowywać w suchym i chłodnym miejscu.
 
 ---
 
-## Reference Manual
+### Step 3: Publish Offer via API
 
-See detailed parameter mapping in [allegro_guidelines.md](./references/allegro_guidelines.md).
+Post the prepared payload to the listing endpoint:
+**`POST https://vsebezlepku-orders.vercel.app/api/allegro/create-offer`**
+
+```json
+{
+  "url": "https://www.vsebezlepku.cz/...",
+  "pricePln": 24.99,
+  "titlePl": "Piaceri Mediterranei KOSZYCZKI Z MORELAMI Bezglutenowe 200g",
+  "productCode": "BM06",
+  "categoryId": "261420",
+  "descriptionHtml": "<p>...</p>"
+}
+```
+
+The endpoint automatically:
+1. Uploads high-res product photos to Allegro CDN (`https://upload.allegro.pl/sale/images`).
+2. Pulls template IDs:
+   - **Cennik dostawy**: `6a22fcad-c8c1-495e-9c98-0b4b16853589`
+   - **Warunki zwrotów**: `2bba241d-b306-42bb-a91a-a1353fc9e2c2`
+   - **Reklamacje**: `618157f7-2d10-4c6c-a976-79e3c39abe37`
+   - **Lokalizacja**: Bocanovice, 73991, CZ
+   - **Faktura**: VAT
+3. Calculates stock buffer (`sklad - 2` from PostgreSQL DB).
+4. Creates the offer (`POST /sale/offers`), activates it, and returns the live offer link:
+   `https://allegro.pl/oferta/{offerId}`.
+
+---
+
+## 2. Multi-Market Sync (CZ, SK, HU)
+Once published on `allegro.pl`, Allegro automatically handles catalog matching (*Produktyzacja*) and translates to `allegro.cz`, `allegro.sk`, and `allegro.hu` using the linked EAN and Polish base offer.
+
+---
+
+## 3. Stock Buffer Rule
+- Initial stock on Allegro is strictly **`sklad - 2`**.
+- If DB stock is $\le 2$, the offer is created with `stock: 0` and kept in `INACTIVE` state until new stock arrives.
