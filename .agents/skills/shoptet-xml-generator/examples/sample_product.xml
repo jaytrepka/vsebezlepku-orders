@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SHOP>
+  <SHOPITEM id="709">
+    <NAME>Piaceri Mediterranei TORTELLONI DÝŇOVÉ 250g (2 porce)</NAME>
+    <GUID>be5452d2-373f-11f0-b061-46a7eb346db2</GUID>
+    <CODE>709</CODE>
+    <SHORT_DESCRIPTION><![CDATA[<p>Lahodné bezlepkové tortelloni plněné jemnou dýňovou náplní s ricottou a Grana Padano. Připravené bez palmového oleje, bez konzervantů a s vejci od slepic z volného chovu.</p>]]></SHORT_DESCRIPTION>
+    <DESCRIPTION><![CDATA[<p><strong>Tortelloni alla Zucca</strong> od <em>Piaceri Mediterranei</em> jsou výjimečné bezlepkové těstoviny, které kombinují tradiční italskou recepturu s moderními požadavky na výživu. Každý kousek je plněný jemnou směsí dýně, ricotty a Grana Padano, což vytváří harmonickou chuťovou kombinaci.</p>
+    <p>Těstoviny jsou vyrobeny z rýžové mouky a kukuřičného škrobu, bez použití palmového oleje a konzervantů. Vejce pocházejí od slepic z volného chovu, což zajišťuje vyšší kvalitu a etický přístup k chovu zvířat.</p>
+    <p>Příprava je rychlá a snadná – stačí 2 minuty vaření a můžete si vychutnat autentický italský pokrm.</p>
+    <p>&nbsp;</p>
+    <p><strong>Složení:&nbsp;</strong></p>
+    <p>Kukuřičný škrob, rýžová mouka, <strong>vejce</strong> 15 %, dýně 10 %, ricotta (syrovátka, <strong>mléko</strong>, <strong>smetana</strong>, sůl, regulátor kyselosti: kyselina citronová), <strong>vaječný</strong> bílek, Grana Padano (<strong>mléko</strong>, sůl, syřidlo, lysozym z <strong>vejce</strong>), dextróza, rostlinná vláknina (bambus, psyllium, hrách), <strong>smetana</strong>, bramborové vločky, sůl, syrovátka, extra panenský olivový olej, aroma, zahušťovadla: xanthanová guma, guarová guma.<br /></p>
+    <p>&nbsp;</p>
+    <p><strong>Nutriční hodnoty (na 100g):</strong></p>
+    <table style="width: 364px;">
+    <thead>
+    <tr>
+    <th style="width: 245px;"><p><b>Energetická hodnota</b></p></th>
+    <th style="width: 117px;"><p><b>933 kJ / 222 kcal</b></p></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr><td><p><span>Tuky</span></p></td><td><p><span>6,7 g</span></p></td></tr>
+    <tr><td><p><span>z toho nasycené mastné kyseliny</span></p></td><td><p><span>3,7 g</span></p></td></tr>
+    <tr><td><p><span>Sacharidy</span></p></td><td><p><span>32,5 g</span></p></td></tr>
+    <tr><td><p><span>z toho cukry</span></p></td><td><p><span>6,3 g</span></p></td></tr>
+    <tr><td><p><span>Vláknina</span></p></td><td><p><span>4,2 g</span></p></td></tr>
+    <tr><td><p><span>Bílkoviny</span></p></td><td><p><span>5,7 g</span></p></td></tr>
+    <tr><td><p><span>Sůl</span></p></td><td><p><span>1,26 g</span></p></td></tr>
+    </tbody>
+    </table>
+    <p>&nbsp;</p>]]></DESCRIPTION>
+    <MANUFACTURER>Piaceri Mediterranei</MANUFACTURER>
+    <SUPPLIER>Piaceri Mediterranei</SUPPLIER>
+    <ADULT>0</ADULT>
+    <ITEM_TYPE>product</ITEM_TYPE>
+    <CATEGORIES>
+      <CATEGORY id="940">Těstoviny &gt; Tortelloni a Tortellini</CATEGORY>
+      <DEFAULT_CATEGORY id="940" google-id="434">Těstoviny &gt; Tortelloni a Tortellini</DEFAULT_CATEGORY>
+    </CATEGORIES>
+    <IMAGES>
+      <IMAGE description="Tortelloni zucca SITO">https://cdn.myshoptet.com/usr/www.vsebezlepku.cz/user/shop/orig/709_tortelloni-zucca-sito.png</IMAGE>
+    </IMAGES>
+    <FLAGS>
+      <FLAG><CODE>action</CODE><ACTIVE>1</ACTIVE></FLAG>
+      <FLAG><CODE>new</CODE><VALID_FROM>2025-05-22</VALID_FROM><VALID_UNTIL>2025-06-30</VALID_UNTIL></FLAG>
+      <FLAG><CODE>tip</CODE><ACTIVE>0</ACTIVE></FLAG>
+    </FLAGS>
+    <VISIBILITY>visible</VISIBILITY>
+    <ALLOWS_PAY_ONLINE>1</ALLOWS_PAY_ONLINE>
+    <UNIT>ks</UNIT>
+    <LOGISTIC><WEIGHT>0.25</WEIGHT></LOGISTIC>
+    <UNIT_OF_MEASURE>
+      <PACKAGE_AMOUNT>250</PACKAGE_AMOUNT>
+      <PACKAGE_AMOUNT_UNIT>g</PACKAGE_AMOUNT_UNIT>
+      <MEASURE_AMOUNT>100</MEASURE_AMOUNT>
+      <MEASURE_AMOUNT_UNIT>g</MEASURE_AMOUNT_UNIT>
+    </UNIT_OF_MEASURE>
+    <CURRENCY>CZK</CURRENCY>
+    <VAT>12</VAT>
+    <PRICE_VAT>139</PRICE_VAT>
+    <STANDARD_PRICE>139</STANDARD_PRICE>
+    <PURCHASE_PRICE>90.64</PURCHASE_PRICE>
+    <STOCK><AMOUNT>0</AMOUNT></STOCK>
+    <AVAILABILITY_OUT_OF_STOCK>Na dotaz</AVAILABILITY_OUT_OF_STOCK>
+    <AVAILABILITY_IN_STOCK>Skladem</AVAILABILITY_IN_STOCK>
+    <VISIBLE>1</VISIBLE>
+  </SHOPITEM>
+</SHOP>

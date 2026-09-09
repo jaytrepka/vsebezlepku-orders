@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncOrderItemsToAllegro } from "@/lib/allegro";
 
 // Helper function to normalize product name (remove " - Pomozte neplýtvat" suffix)
 function normalizeProductName(name: string): string {
@@ -239,6 +240,16 @@ export async function POST(request: NextRequest) {
             productName: i.productName,
             quantity: i.quantity || 1,
           })));
+
+          // Automatically update stock on Allegro for the ordered items
+          try {
+            await syncOrderItemsToAllegro(items.map((i: { productName: string; productCode?: string }) => ({
+              productName: i.productName,
+              productCode: i.productCode || null,
+            })));
+          } catch (allegroErr) {
+            console.error("[Shoptet Import] Allegro sync error (non-fatal):", allegroErr);
+          }
         }
       } catch (orderError) {
         console.error("Error processing order:", orderError);

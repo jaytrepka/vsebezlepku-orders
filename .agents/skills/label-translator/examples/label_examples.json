@@ -1,0 +1,35 @@
+[
+  {
+    "productName": "Piaceri Mediterranei TORTELLONI DÝŇOVÉ 250g (2 porce)",
+    "translations": {
+      "cs": {
+        "nazev": "DÝŇOVÉ TORTELLONI (250g)",
+        "slozeni": "Kukuřičný škrob, rýžová mouka, **vejce** 15 %, dýně 10 %, ricotta (syrovátka, **mléko**, **smetana**, sůl, regulátor kyselosti: kyselina citronová), **vaječný** bílek, Grana Padano (**mléko**, sůl, syřidlo, lysozym z **vejce**), dextróza, rostlinná vláknina (bambus, psyllium, hrách), **smetana**, bramborové vločky, sůl, syrovátka, extra panenský olivový olej, aroma, zahušťovadla: xanthanová guma, guarová guma.",
+        "nutricniHodnoty": "Energetická hodnota: 933 kJ / 222 kcal, Tuky: 6,7 g (z toho nasycené mastné kyseliny: 3,7 g), Sacharidy: 32,5 g (z toho cukry: 6,3 g), Vláknina: 4,2 g, Bílkoviny: 5,7 g, Sůl: 1,26 g",
+        "skladovani": "Uchovávejte na suchém a chladném místě.",
+        "vyrobce": "Piaceri Mediterranei, Itálie"
+      },
+      "pl": {
+        "nazev": "TORTELLONI DYNIOWE (250g)",
+        "slozeni": "Skrobia kukurydziana, mąka ryżowa, **jaja** 15%, dynia 10%, ricotta (serwatka, **mleko**, **śmietanka**, sól, regulator kwasowości: kwas cytrynowy), białko **jaja**, Grana Padano (**mleko**, sól, podpuszczka, lizozym z **jaja**), dekstroza, błonnik roślinny (bambus, babka jajowata, groch), **śmietanka**, płatki ziemniaczane, sól, serwatka, oliwa z oliwek extra virgin, aromat, substancje zagęszczające: guma ksantanowa, guma guar.",
+        "nutricniHodnoty": "Wartość energetyczna: 933 kJ / 222 kcal, Tłuszcz: 6,7 g (w tym kwasy tłuszczowe nasycone: 3,7 g), Węglowodany: 32,5 g (w tym cukry: 6,3 g), Błonnik: 4,2 g, Białko: 5,7 g, Sól: 1,26 g",
+        "skladovani": "Przechowywać w suchym i chłodnym miejscu.",
+        "vyrobce": "Piaceri Mediterranei, Włochy"
+      },
+      "hu": {
+        "nazev": "SÜTŐTÖKÖS TORTELLONI (250g)",
+        "slozeni": "Kukoricakeményítő, rizsliszt, **tojás** 15%, sütőtök 10%, ricotta (tejsavó, **tej**, **tejszín**, só, savanyúságot szabályozó anyag: citromsav), **tojásfehérje**, Grana Padano (**tej**, só, oltó, lizozim **tojásból**), dextróz, növényi rost (bambusz, psyllium, borsó), **tejszín**, burgonyapehely, só, tejsavó, extra szűz olívaolaj, aroma, sűrítőanyagok: xantángumi, guargumi.",
+        "nutricniHodnoty": "Energia: 933 kJ / 222 kcal, Zsír: 6,7 g (amelyből telített zsírsavak: 3,7 g), Szénhidrát: 32,5 g (amelyből cukrok: 6,3 g), Rost: 4,2 g, Fehérje: 5,7 g, Só: 1,26 g",
+        "skladovani": "Száraz, hűvös helyen tárolandó.",
+        "vyrobce": "Piaceri Mediterranei, Olaszország"
+      },
+      "sk": {
+        "nazev": "DYŇOVÉ TORTELLONI (250g)",
+        "slozeni": "Kukuričný škrob, ryžová múka, **vajcia** 15 %, tekvica 10 %, ricotta (srvátka, **mlieko**, **smotana**, soľ, regulátor kyslosti: kyselina citrónová), **vaječný** bielok, Grana Padano (**mlieko**, soľ, syridlo, lyzozým z **vajec**), dextróza, rastlinná vláknina (bambus, psyllium, hrach), **smotana**, zemiakové vločky, soľ, srvátka, extra panenský olivový olej, aróma, zahusťovadlá: xantánová guma, guarová guma.",
+        "nutricniHodnoty": "Energia: 933 kJ / 222 kcal, Tuky: 6,7 g (z toho nasýtené mastné kyseliny: 3,7 g), Sacharidy: 32,5 g (z toho cukry: 6,3 g), Vláknina: 4,2 g, Bielkoviny: 5,7 g, Soľ: 1,26 g",
+        "skladovani": "Skladujte na suchom a chladnom mieste.",
+        "vyrobce": "Piaceri Mediterranei, Taliansko"
+      }
+    }
+  }
+]
