@@ -104,10 +104,16 @@ export async function getAllegroAccessTokenWithDebug(): Promise<{ token: string 
 
 
 
+export interface AllegroOfferInfo {
+  id: string;
+  status?: string;
+  stock?: number;
+}
+
 /**
- * Finds the Allegro Offer ID matching a Shoptet product code (SKU / external.id) or product name
+ * Finds the Allegro Offer matching a Shoptet product code (SKU / external.id) or product name
  */
-export async function getAllegroOfferIdByCode(token: string, productCode: string, productName?: string): Promise<string | null> {
+export async function getAllegroOfferDetails(token: string, productCode: string, productName?: string): Promise<AllegroOfferInfo | null> {
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
 
   try {
@@ -123,7 +129,11 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
     if (response.ok) {
       const data = await response.json();
       if (data.offers && data.offers.length > 0) {
-        return data.offers[0].id;
+        return {
+          id: data.offers[0].id,
+          status: data.offers[0].publication?.status,
+          stock: data.offers[0].stock?.available,
+        };
       }
     }
 
@@ -140,7 +150,11 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
     if (nameResponse.ok) {
       const data = await nameResponse.json();
       if (data.offers && data.offers.length > 0) {
-        return data.offers[0].id;
+        return {
+          id: data.offers[0].id,
+          status: data.offers[0].publication?.status,
+          stock: data.offers[0].stock?.available,
+        };
       }
     }
 
@@ -151,6 +165,13 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
   }
 }
 
+/**
+ * Finds the Allegro Offer ID matching a Shoptet product code (SKU / external.id) or product name
+ */
+export async function getAllegroOfferIdByCode(token: string, productCode: string, productName?: string): Promise<string | null> {
+  const details = await getAllegroOfferDetails(token, productCode, productName);
+  return details ? details.id : null;
+}
 
 /**
  * Updates the stock quantity of an offer on Allegro
@@ -197,6 +218,42 @@ export async function updateAllegroOfferStock(token: string, offerId: string, qu
 }
 
 /**
+ * Activates / resumes an offer on Allegro when stock is positive (> 0)
+ */
+export async function activateAllegroOffer(token: string, offerId: string): Promise<boolean> {
+  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+  const commandId = crypto.randomUUID();
+
+  try {
+    const response = await fetch(`${ALLEGRO_API_URL}/sale/offer-publication-commands/${commandId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.allegro.public.v1+json",
+        "Content-Type": "application/vnd.allegro.public.v1+json",
+        "User-Agent": userAgent,
+      },
+      body: JSON.stringify({
+        publication: { action: "ACTIVATE" },
+        offerCriteria: [{ offers: [{ id: offerId }], type: "CONTAINS_OFFERS" }],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error(`[Allegro] Failed to activate offer ${offerId}: ${response.status} - ${err}`);
+      return false;
+    }
+
+    console.log(`[Allegro] 🟢 Nabídka ${offerId} byla úspěšně aktivována / obnovena`);
+    return true;
+  } catch (err) {
+    console.error(`[Allegro] Error activating offer ${offerId}:`, err);
+    return false;
+  }
+}
+
+/**
  * Ends / closes an offer on Allegro when stock reaches 0
  */
 export async function closeAllegroOffer(token: string, offerId: string): Promise<boolean> {
@@ -220,7 +277,7 @@ export async function closeAllegroOffer(token: string, offerId: string): Promise
 
     if (!response.ok) {
       const err = await response.text();
-      console.error(`[Allegro] Failed to close offer ${offerId}:`, err);
+      console.error(`[Allegro] Failed to close offer ${offerId}: ${response.status} - ${err}`);
       return false;
     }
 
@@ -233,7 +290,7 @@ export async function closeAllegroOffer(token: string, offerId: string): Promise
 }
 
 /**
- * Automatically syncs only the specified ordered products to Allegro with a safety buffer of -3 pieces
+ * Automatically syncs only the specified ordered products to Allegro with a safety buffer of -2 pieces
  */
 export async function syncOrderItemsToAllegro(items: { productCode?: string | null; productName?: string }[]): Promise<void> {
   const token = await getAllegroAccessToken();
@@ -265,14 +322,18 @@ export async function syncOrderItemsToAllegro(items: { productCode?: string | nu
       // Safety buffer (-2 pieces)
       const allegroStock = Math.max(0, stockProduct.totalCount - 2);
 
-      const offerId = await getAllegroOfferIdByCode(token, code);
-      if (!offerId) {
+      const offerDetails = await getAllegroOfferDetails(token, code, item.productName);
+      if (!offerDetails || !offerDetails.id) {
         console.log(`[Allegro] Nabídka pro kód ${code} nebyla na Allegru nalezena`);
         continue;
       }
 
+      const offerId = offerDetails.id;
+
       if (allegroStock > 0) {
         await updateAllegroOfferStock(token, offerId, allegroStock);
+        // Automatically activate / resume offer if it was inactive/ended or to ensure it is live
+        await activateAllegroOffer(token, offerId);
       } else {
         await closeAllegroOffer(token, offerId);
       }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncOrderItemsToAllegro, getAllegroAccessToken, getAllegroAccessTokenWithDebug, getAllegroOfferIdByCode, updateAllegroOfferStock, closeAllegroOffer } from "@/lib/allegro";
+import { syncOrderItemsToAllegro, getAllegroAccessToken, getAllegroAccessTokenWithDebug, getAllegroOfferIdByCode, updateAllegroOfferStock, activateAllegroOffer, closeAllegroOffer } from "@/lib/allegro";
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,8 +68,9 @@ export async function GET(request: NextRequest) {
 
       if (offerId) {
         if (allegroStock > 0) {
-          const ok = await updateAllegroOfferStock(token, offerId, allegroStock);
-          status = ok ? `updated to ${allegroStock} pcs` : "update_failed";
+          const okStock = await updateAllegroOfferStock(token, offerId, allegroStock);
+          const okAct = await activateAllegroOffer(token, offerId);
+          status = okStock ? `updated to ${allegroStock} pcs (active)` : "update_failed";
         } else {
           const ok = await closeAllegroOffer(token, offerId);
           status = ok ? "closed (0 pcs)" : "close_failed";

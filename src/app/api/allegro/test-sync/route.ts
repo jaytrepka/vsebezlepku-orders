@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllegroAccessToken, getAllegroOfferIdByCode, updateAllegroOfferStock, closeAllegroOffer } from "@/lib/allegro";
+import { getAllegroAccessToken, getAllegroOfferIdByCode, updateAllegroOfferStock, activateAllegroOffer, closeAllegroOffer } from "@/lib/allegro";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
       const allegroStock = Math.max(0, stockProduct.totalCount - 2);
       if (allegroStock > 0) {
         diagnostics.updateSuccess = await updateAllegroOfferStock(token, offerId, allegroStock);
+        diagnostics.activateSuccess = await activateAllegroOffer(token, offerId);
       } else {
         diagnostics.closeSuccess = await closeAllegroOffer(token, offerId);
       }
