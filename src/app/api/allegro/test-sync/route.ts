@@ -41,17 +41,18 @@ export async function GET(request: NextRequest) {
     const dataA = await resA.json();
     diagnostics.externalIdSearchResults = dataA;
 
-    // Test B: By name
-    const resB = await fetch(`https://api.allegro.pl/sale/offers?name=${encodeURIComponent(code)}`, {
+    // Test C: In Product Catalog
+    const phrase = searchParams.get("phrase") || code;
+    const resC = await fetch(`https://api.allegro.pl/sale/products?phrase=${encodeURIComponent(phrase)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.allegro.public.v1+json",
         "User-Agent": userAgent,
       },
     });
-    diagnostics.nameSearchStatus = resB.status;
-    const dataB = await resB.json();
-    diagnostics.nameSearchResults = dataB;
+    diagnostics.catalogSearchStatus = resC.status;
+    const dataC = await resC.json();
+    diagnostics.catalogSearchResults = dataC;
 
     // 3. Find stock in DB
     const stockProduct = await prisma.stockProduct.findFirst({

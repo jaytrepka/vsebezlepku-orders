@@ -375,6 +375,51 @@ export async function uploadAllegroImage(token: string, imageUrl: string): Promi
   }
 }
 
+/**
+ * Searches the Allegro Product Catalog by EAN or phrase
+ */
+export async function searchAllegroCatalog(token: string, phrase: string, ean?: string): Promise<string | null> {
+  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+
+  try {
+    if (ean && ean.trim().length >= 8) {
+      const eanRes = await fetch(`${ALLEGRO_API_URL}/sale/products?ean=${encodeURIComponent(ean.trim())}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.allegro.public.v1+json",
+          "User-Agent": userAgent,
+        },
+      });
+      if (eanRes.ok) {
+        const eanData = await eanRes.json();
+        if (eanData.products && eanData.products.length > 0) {
+          return eanData.products[0].id;
+        }
+      }
+    }
+
+    // Search by phrase
+    const phraseRes = await fetch(`${ALLEGRO_API_URL}/sale/products?phrase=${encodeURIComponent(phrase)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.allegro.public.v1+json",
+        "User-Agent": userAgent,
+      },
+    });
+    if (phraseRes.ok) {
+      const phraseData = await phraseRes.json();
+      if (phraseData.products && phraseData.products.length > 0) {
+        return phraseData.products[0].id;
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error("[Allegro] Error searching product catalog:", err);
+    return null;
+  }
+}
+
 export interface CreateAllegroOfferParams {
   titlePl: string;
   productCode: string;
@@ -390,7 +435,7 @@ export interface CreateAllegroOfferParams {
 }
 
 /**
- * Creates and lists a new offer on Allegro using template settings
+ * Creates and lists a new offer on Allegro using POST /sale/product-offers
  */
 export async function createAllegroOffer(token: string, params: CreateAllegroOfferParams): Promise<{ success: boolean; offerId?: string; offerUrl?: string; error?: string }> {
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
@@ -407,10 +452,6 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       }
     }
 
-    if (uploadedImages.length === 0 && params.imageUrls.length > 0) {
-      console.warn("[Allegro] No images uploaded successfully, continuing with original URLs if any");
-    }
-
     const shippingRatesId = params.shippingRatesId || "6a22fcad-c8c1-495e-9c98-0b4b16853589";
     const returnPolicyId = params.returnPolicyId || "2bba241d-b306-42bb-a91a-a1353fc9e2c2";
     const impliedWarrantyId = params.impliedWarrantyId || "618157f7-2d10-4c6c-a976-79e3c39abe37";
@@ -419,10 +460,29 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
     // Clean description HTML
     const descriptionContent = params.descriptionHtml || `<p>${params.titlePl}</p>`;
 
+    // Check if product exists in Allegro Catalog
+    const catalogProductId = await searchAllegroCatalog(token, params.titlePl, params.ean);
+
+    const productSet = catalogProductId
+      ? [{ product: { id: catalogProductId } }]
+      : [
+          {
+            product: {
+              name: params.titlePl.substring(0, 75),
+              category: { id: categoryId },
+              images: uploadedImages.map((url) => ({ url })),
+              parameters: [
+                { id: "11323", values: ["Nowy"] }, // Stan: Nowy
+                ...(params.ean ? [{ id: "225693", values: [params.ean] }] : []),
+              ],
+            },
+          },
+        ];
+
     const payload: any = {
       name: params.titlePl.substring(0, 75),
+      productSet,
       category: { id: categoryId },
-      primaryImage: uploadedImages.length > 0 ? { url: uploadedImages[0] } : undefined,
       images: uploadedImages.map((url) => ({ url })),
       sellingMode: {
         format: "BUY_NOW",
@@ -474,7 +534,7 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       },
     };
 
-    const response = await fetch(`${ALLEGRO_API_URL}/sale/offers`, {
+    const response = await fetch(`${ALLEGRO_API_URL}/sale/product-offers`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -485,9 +545,9 @@ export async function createAllegroOffer(token: string, params: CreateAllegroOff
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
+    if (!response.ok && response.status !== 202 && response.status !== 201) {
       const errText = await response.text();
-      console.error(`[Allegro] Failed to create offer: ${response.status} - ${errText}`);
+      console.error(`[Allegro] Failed to create product-offer: ${response.status} - ${errText}`);
       return { success: false, error: `Allegro API vrátilo status ${response.status}: ${errText}` };
     }
 
