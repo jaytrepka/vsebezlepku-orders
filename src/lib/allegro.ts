@@ -81,8 +81,9 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
       }
     }
 
-    // 2. Second attempt: search by phrase matching the code
-    const phraseResponse = await fetch(`${ALLEGRO_API_URL}/sale/offers?phrase=${encodeURIComponent(productCode)}`, {
+    // 2. Second attempt: search by name matching the product code or name
+    const nameToSearch = productName || productCode;
+    const nameResponse = await fetch(`${ALLEGRO_API_URL}/sale/offers?name=${encodeURIComponent(nameToSearch)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.allegro.public.v1+json",
@@ -90,8 +91,8 @@ export async function getAllegroOfferIdByCode(token: string, productCode: string
       },
     });
 
-    if (phraseResponse.ok) {
-      const data = await phraseResponse.json();
+    if (nameResponse.ok) {
+      const data = await nameResponse.json();
       if (data.offers && data.offers.length > 0) {
         return data.offers[0].id;
       }
