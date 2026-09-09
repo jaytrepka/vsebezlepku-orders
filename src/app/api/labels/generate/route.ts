@@ -30,30 +30,40 @@ export async function POST(request: NextRequest) {
       where: { language },
     });
 
-    // Create a map of productName -> label for quick lookup
-    const labelMap = new Map<string, typeof allLabels[0]>();
-    for (const label of allLabels) {
-      labelMap.set(label.productName, label);
-      // Also index by stripped brand prefix for fuzzy matching
-      const stripped = stripBrandPrefix(label.productName);
-      if (stripped !== label.productName && !labelMap.has(stripped)) {
-        labelMap.set(stripped, label);
-      }
-    }
-
-    // Helper to normalize product name (removes "Pomozte neplýtvat" suffix)
+    // Helper to normalize product name (removes "Pomozte neplýtvat" suffix and collapses spaces)
     function normalizeProductName(name: string): string {
-      return name.replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "").replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "").trim();
+      return name
+        .replace(/\s+/g, " ")
+        .replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "")
+        .replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "")
+        .trim();
     }
 
     // Strip brand prefix + "bezlepkové" to get core product name for fuzzy matching
     function stripBrandPrefix(name: string): string {
       return name
+        .replace(/\s+/g, " ")
         .replace(/\s*-\s*Pomozte nepl[ýy]tvat\s*$/i, "")
+        .replace(/\s*-\s*Pomoze nepl[ýy]tvat\s*$/i, "")
         .replace(/^(Piaceri Mediterranei|Massimo Zero|Bauer|Glutiniente)\s*/i, "")
         .replace(/bezlepkov[áéý]\s*/i, "")
         .replace(/bezlepkové\s*/i, "")
+        .replace(/\s+/g, " ")
         .trim();
+    }
+
+    // Create a map of productName -> label for quick lookup
+    const labelMap = new Map<string, (typeof allLabels)[0]>();
+    for (const label of allLabels) {
+      labelMap.set(label.productName, label);
+      const norm = normalizeProductName(label.productName);
+      if (!labelMap.has(norm)) {
+        labelMap.set(norm, label);
+      }
+      const stripped = stripBrandPrefix(label.productName);
+      if (!labelMap.has(stripped)) {
+        labelMap.set(stripped, label);
+      }
     }
 
     // Build label requests
