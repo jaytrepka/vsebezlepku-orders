@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncOrderItemsToAllegro, getAllegroAccessToken, getAllegroOfferIdByCode, updateAllegroOfferStock, closeAllegroOffer } from "@/lib/allegro";
+import { syncOrderItemsToAllegro, getAllegroAccessToken, getAllegroAccessTokenWithDebug, getAllegroOfferIdByCode, updateAllegroOfferStock, closeAllegroOffer } from "@/lib/allegro";
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,10 +25,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Žádná objednávka nebyla nalezena" }, { status: 404 });
     }
 
-    const token = await getAllegroAccessToken();
-    if (!token) {
-      return NextResponse.json({ error: "Nepodařilo se získat Allegro token. Zkontrolujte ALLEGRO_REFRESH_TOKEN na Vercelu." }, { status: 400 });
+    const authResult = await getAllegroAccessTokenWithDebug();
+    if (!authResult.token) {
+      return NextResponse.json({ 
+        error: "Nepodařilo se získat Allegro token.",
+        details: authResult.error,
+        debug: authResult.debug,
+      }, { status: 400 });
     }
+    const token = authResult.token;
 
     const syncResults: Array<{
       productCode: string | null;

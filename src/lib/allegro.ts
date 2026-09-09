@@ -66,6 +66,57 @@ export async function getAllegroAccessToken(): Promise<string | null> {
   }
 }
 
+export async function getAllegroAccessTokenWithDebug(): Promise<{ token: string | null; error?: string; debug?: any }> {
+  const clientId = process.env.ALLEGRO_CLIENT_ID;
+  const clientSecret = process.env.ALLEGRO_CLIENT_SECRET;
+  const refreshToken = process.env.ALLEGRO_REFRESH_TOKEN;
+  const redirectUri = process.env.ALLEGRO_REDIRECT_URI || "https://vsebezlepku-orders.vercel.app/api/allegro/callback";
+  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+
+  const debug = {
+    hasClientId: !!clientId,
+    hasClientSecret: !!clientSecret,
+    hasRefreshToken: !!refreshToken,
+    refreshTokenLength: refreshToken ? refreshToken.length : 0,
+    redirectUri,
+  };
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    return { token: null, error: `Chybí proměnné prostředí: ClientID=${!!clientId}, ClientSecret=${!!clientSecret}, RefreshToken=${!!refreshToken}`, debug };
+  }
+
+  try {
+    const basicAuth = Buffer.from(`${clientId.trim()}:${clientSecret.trim()}`).toString("base64");
+
+    const bodyParams = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken.trim(),
+      redirect_uri: redirectUri,
+    });
+
+    const response = await fetch(ALLEGRO_AUTH_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        "User-Agent": userAgent,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: bodyParams.toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { token: null, error: `Allegro API vrátilo status ${response.status}: ${errorText}`, debug };
+    }
+
+    const data = await response.json();
+    return { token: data.access_token, debug };
+  } catch (err) {
+    return { token: null, error: `Výjimka při volání Allegro API: ${String(err)}`, debug };
+  }
+}
+
+
 /**
  * Finds the Allegro Offer ID matching a Shoptet product code (SKU / external.id) or product name
  */
