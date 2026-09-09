@@ -497,17 +497,14 @@ export function sanitizeAllegroDescriptionHtml(rawHtml: string): string {
     .replace(/<\/tr>/gi, "\n")
     .replace(/<\/li>/gi, "\n")
     .replace(/<th[^>]*>([\s\S]*?)<\/th>/gi, "<b>$1: </b>")
-    .replace(/<td[^>]*>([\s\S]*?)<\/td>/gi, " $1 ");
-
-  // 2. Extract h1 / h2 if present
-  clean = clean
+    .replace(/<td[^>]*>([\s\S]*?)<\/td>/gi, " $1 ")
     .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n__H1__$1__H1__\n")
     .replace(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>/gi, "\n__H2__$1__H2__\n");
 
-  // 3. Strip all other HTML tags except <b> and </b>
+  // 2. Strip all other HTML tags except <b> and </b>
   clean = clean.replace(/<(?!\/?b\b)[^>]+>/gi, "");
 
-  // 4. Decode common HTML entities
+  // 3. Decode common HTML entities
   clean = clean
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -516,7 +513,7 @@ export function sanitizeAllegroDescriptionHtml(rawHtml: string): string {
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">");
 
-  // 5. Split by newlines, trim and rebuild clean HTML blocks
+  // 4. Split by newlines, trim and rebuild clean HTML blocks
   const lines = clean
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -525,22 +522,47 @@ export function sanitizeAllegroDescriptionHtml(rawHtml: string): string {
   const sections: string[] = [];
   for (const line of lines) {
     if (line.startsWith("__H1__") && line.endsWith("__H1__")) {
-      const content = line.replace(/__H1__/g, "").trim();
+      const content = line.replace(/__H1__/g, "").replace(/<\/?b>/gi, "").trim();
       if (content) sections.push(`<h1>${content}</h1>`);
     } else if (line.startsWith("__H2__") && line.endsWith("__H2__")) {
-      const content = line.replace(/__H2__/g, "").trim();
+      const content = line.replace(/__H2__/g, "").replace(/<\/?b>/gi, "").trim();
       if (content) sections.push(`<h2>${content}</h2>`);
     } else {
-      // Clean up stray/unbalanced <b> tags within line
-      const bOpenCount = (line.match(/<b>/gi) || []).length;
-      const bCloseCount = (line.match(/<\/b>/gi) || []).length;
       let safeLine = line;
-      if (bOpenCount > bCloseCount) {
-        safeLine += "</b>".repeat(bOpenCount - bCloseCount);
-      } else if (bCloseCount > bOpenCount) {
-        safeLine = "<b>".repeat(bCloseCount - bOpenCount) + safeLine;
+      // Remove multiple consecutive <b> or </b>
+      safeLine = safeLine.replace(/(?:<b>\s*)+<b>/gi, "<b>");
+      safeLine = safeLine.replace(/(?:<\/b>\s*)+<\/b>/gi, "</b>");
+      // Remove empty <b></b>
+      safeLine = safeLine.replace(/<b>\s*<\/b>/gi, "");
+
+      // Fix any remaining nested or unbalanced <b> tags
+      let inBold = false;
+      let cleaned = "";
+      const tokens = safeLine.split(/(<b>|<\/b>)/gi);
+      for (const token of tokens) {
+        if (token.toLowerCase() === "<b>") {
+          if (!inBold) {
+            cleaned += "<b>";
+            inBold = true;
+          }
+        } else if (token.toLowerCase() === "</b>") {
+          if (inBold) {
+            cleaned += "</b>";
+            inBold = false;
+          }
+        } else {
+          cleaned += token;
+        }
       }
-      sections.push(`<p>${safeLine}</p>`);
+      if (inBold) {
+        cleaned += "</b>";
+      }
+
+      // Final check: don't output empty or punctuation-only lines
+      const textOnly = cleaned.replace(/<\/?b>/gi, "").trim();
+      if (textOnly.length > 0 && !/^[:\s\-\.]+$/.test(textOnly)) {
+        sections.push(`<p>${cleaned}</p>`);
+      }
     }
   }
 

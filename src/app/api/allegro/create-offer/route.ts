@@ -324,54 +324,90 @@ export async function translateHtmlDescriptionToPolish(rawHtml: string, fallback
     return `<h2>${fallbackTitlePl}</h2>\n<p>Wysokiej jakości produkt bezglutenowy.</p>`;
   }
 
-  let text = rawHtml
-    .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "<b>$1</b>")
-    .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "<b>$1</b>")
-    .replace(/<th[^>]*>([\s\S]*?)<\/th>/gi, "<b>$1: </b>")
-    .replace(/<td[^>]*>([\s\S]*?)<\/td>/gi, " $1 ")
-    .replace(/<tr[^>]*>/gi, "\n")
-    .replace(/<\/tr>/gi, "\n")
+  // 1. Extract ingredients section if present
+  let ingredients = "";
+  const ingMatch = rawHtml.match(/(?:Složení|Složení:)([\s\S]*?)(?:Nutriční|Výživové|Výživové údaje|Skladování|Výrobce|<table|$)/i);
+  if (ingMatch) {
+    ingredients = ingMatch[1]
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // 2. Extract nutrition table or text
+  let nutrition = "";
+  const nutMatch = rawHtml.match(/(?:Nutriční|Výživové|Výživové údaje)[\s\S]*?(?:<\/table>|<div class="clear"|$)/i);
+  if (nutMatch) {
+    const rawNut = nutMatch[0];
+    const rows = [...rawNut.matchAll(/<tr[^>]*>[\s\S]*?<t[hd][^>]*>([\s\S]*?)<\/t[hd]>[\s\S]*?<t[hd][^>]*>([\s\S]*?)<\/t[hd]>[\s\S]*?<\/tr>/gi)];
+    if (rows.length > 0) {
+      const items = rows.map((r) => {
+        const key = r[1].replace(/<[^>]+>/g, "").replace(/[:\s]+$/, "").trim();
+        const val = r[2].replace(/<[^>]+>/g, "").trim();
+        return `${key}: ${val}`;
+      }).filter((it) => it.length > 3);
+      nutrition = items.join(", ");
+    }
+  }
+
+  // 3. Extract storage if present
+  let storage = "";
+  const storageMatch = rawHtml.match(/(?:Skladujte|Skladování:?)([\s\S]*?)(?:Výrobce|Země původu|$)/i);
+  if (storageMatch) {
+    storage = storageMatch[0].replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+  }
+
+  // 4. Extract intro lines (before Složení / Nutriční)
+  const beforeSections = rawHtml.split(/(?:Složení|Nutriční|Výživové|Výrobce|<table)/i)[0];
+  const cleanBefore = beforeSections
+    .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "$1")
+    .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "$1")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<\/div>/gi, "\n")
     .replace(/<\/li>/gi, "\n")
-    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n__H1__$1__H1__\n")
-    .replace(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>/gi, "\n__H2__$1__H2__\n")
-    .replace(/<(?!\/?b\b)[^>]+>/gi, "")
+    .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ");
 
-  const rawLines = text
+  const introLines = cleanBefore
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && l !== "<b>" && l !== "</b>" && l !== ":");
+    .filter((l) => l.length > 10 && !/^(Složení|Nutriční|Výživové)/i.test(l));
 
   const sections: string[] = [];
   sections.push(`<h2>${fallbackTitlePl}</h2>`);
 
-  for (const line of rawLines) {
-    if (line.startsWith("__H1__") && line.endsWith("__H1__")) {
-      const heading = line.replace(/__H1__/g, "").trim();
-      const trHeading = await translateTextToPolish(heading);
-      if (trHeading) sections.push(`<h1>${trHeading}</h1>`);
-    } else if (line.startsWith("__H2__") && line.endsWith("__H2__")) {
-      const heading = line.replace(/__H2__/g, "").trim();
-      const trHeading = await translateTextToPolish(heading);
-      if (trHeading) sections.push(`<h2>${trHeading}</h2>`);
-    } else {
-      const trLine = await translateTextToPolish(line);
-      if (trLine && trLine.length > 2) {
-        const bOpenCount = (trLine.match(/<b>/gi) || []).length;
-        const bCloseCount = (trLine.match(/<\/b>/gi) || []).length;
-        let safeLine = trLine;
-        if (bOpenCount > bCloseCount) {
-          safeLine += "</b>".repeat(bOpenCount - bCloseCount);
-        } else if (bCloseCount > bOpenCount) {
-          safeLine = "<b>".repeat(bCloseCount - bOpenCount) + safeLine;
-        }
-        sections.push(`<p>${safeLine}</p>`);
-      }
+  // Translate intro lines
+  for (const line of introLines) {
+    const trLine = await translateTextToPolish(line);
+    if (trLine && trLine.length > 5) {
+      sections.push(`<p>${trLine}</p>`);
     }
   }
+
+  // Translate and add Ingredients
+  if (ingredients) {
+    const trIngredients = await translateTextToPolish(ingredients);
+    sections.push(`<p><b>Składniki:</b> ${trIngredients}</p>`);
+  }
+
+  // Translate and add Nutrition
+  if (nutrition) {
+    const trNutrition = await translateTextToPolish(nutrition);
+    sections.push(`<p><b>Wartości odżywcze w 100g:</b> ${trNutrition}</p>`);
+  }
+
+  // Translate and add Storage
+  if (storage) {
+    const trStorage = await translateTextToPolish(storage);
+    sections.push(`<p><b>Przechowywanie:</b> ${trStorage}</p>`);
+  } else {
+    sections.push(`<p><b>Przechowywanie:</b> Przechowywać w suchym i chłodnym miejscu.</p>`);
+  }
+
+  // Producer
+  sections.push(`<p><b>Producent:</b> Piaceri Mediterranei – Włochy</p>`);
 
   return sections.join("\n");
 }
