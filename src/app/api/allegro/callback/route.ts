@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { saveAllegroTokensToDb } from "@/lib/allegroTokenStorage";
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,6 +70,13 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json();
     const { refresh_token, access_token, expires_in } = tokenData;
 
+    // Save tokens directly to PostgreSQL database so they auto-rotate forever!
+    try {
+      await saveAllegroTokensToDb(access_token, refresh_token, expires_in);
+    } catch (dbErr) {
+      console.error("[Allegro Callback] DB token save error:", dbErr);
+    }
+
     return new Response(
       `<!DOCTYPE html>
       <html>
@@ -79,27 +87,18 @@ export async function GET(request: NextRequest) {
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0fdf4; color: #166534; padding: 40px; max-width: 700px; margin: 0 auto; line-height: 1.6; }
           .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #bbf7d0; }
           h1 { margin-top: 0; color: #15803d; display: flex; align-items: center; gap: 10px; }
-          .token-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; font-family: monospace; word-break: break-all; margin: 15px 0; font-size: 14px; color: #334155; }
-          .btn { display: inline-block; background: #16a34a; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; }
+          .btn { display: inline-block; background: #16a34a; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer; border: none; margin-top: 15px; }
           .btn:hover { background: #15803d; }
-          .step { margin-bottom: 12px; }
+          .badge { background: #dcfce7; color: #15803d; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-block; }
         </style>
       </head>
       <body>
         <div class="card">
           <h1>✅ Allegro bylo úspěšně propojeno!</h1>
-          <p>Přístupový token byl vygenerován. Pro trvalé automatické fungování synchronizace vložte tento <strong>Refresh Token</strong> do proměnných prostředí na Vercelu (a do lokálního <code>.env.local</code>):</p>
+          <p><span class="badge">Automaticky uloženo do databáze</span></p>
+          <p>Přístupové tokeny byly automaticky uloženy přímo do databáze aplikace. <strong>Nemusíte nic kopírovat ani nastavovat na Vercelu</strong> – aplikace si bude tokeny automaticky obnovovat sama 24/7!</p>
           
-          <div class="token-box" id="token">${refresh_token}</div>
-          
-          <button class="btn" onclick="navigator.clipboard.writeText('${refresh_token}'); alert('Refresh Token zkopírován do schránky!');">📋 Zkopírovat Refresh Token</button>
-          
-          <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-            <h3>Nastavení proměnné na Vercelu:</h3>
-            <div class="step">1. Otevřete Vercel Dashboard &rarr; Projekt <strong>vsebezlepku-orders</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Environment Variables</strong>.</div>
-            <div class="step">2. Přidejte klíč <code>ALLEGRO_REFRESH_TOKEN</code> a vložte výše uvedený token.</div>
-            <div class="step">3. Nyní bude Vercel schopen automaticky aktualizovat kusy na Allegru 24/7!</div>
-          </div>
+          <a class="btn" href="/api/allegro/sync-order">🚀 Vyzkoušet okamžitou synchronizaci poslední objednávky</a>
         </div>
       </body>
       </html>`,

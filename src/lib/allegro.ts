@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { getAllegroTokensFromDb, saveAllegroTokensToDb } from "@/lib/allegroTokenStorage";
 
 const ALLEGRO_API_URL = "https://api.allegro.pl";
 const ALLEGRO_AUTH_URL = "https://allegro.pl/auth/oauth/token";
@@ -7,82 +8,53 @@ const ALLEGRO_AUTH_URL = "https://allegro.pl/auth/oauth/token";
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
 
 /**
- * Gets a fresh or cached Allegro Access Token using the OAuth Refresh Token
+ * Gets a fresh or cached Allegro Access Token using PostgreSQL database or environment
  */
 export async function getAllegroAccessToken(): Promise<string | null> {
-  const clientId = process.env.ALLEGRO_CLIENT_ID;
-  const clientSecret = process.env.ALLEGRO_CLIENT_SECRET;
-  const refreshToken = process.env.ALLEGRO_REFRESH_TOKEN;
-  const redirectUri = process.env.ALLEGRO_REDIRECT_URI || "https://vsebezlepku-orders.vercel.app/api/allegro/callback";
-  const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    console.warn(`[Allegro] Missing credentials: clientId=${!!clientId}, clientSecret=${!!clientSecret}, refreshToken=${!!refreshToken}`);
-    return null;
-  }
-
-  // Use cached token if valid for at least 5 more minutes
-  const now = Date.now();
-  if (cachedAccessToken && cachedAccessToken.expiresAt > now + 5 * 60 * 1000) {
-    return cachedAccessToken.token;
-  }
-
-  try {
-    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-
-    const bodyParams = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken.trim(),
-      redirect_uri: redirectUri,
-    });
-
-    const response = await fetch(ALLEGRO_AUTH_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        "User-Agent": userAgent,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: bodyParams.toString(),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Allegro] Failed to refresh token:", errorText);
-      return null;
-    }
-
-    const data = await response.json();
-    const expiresInMs = (data.expires_in || 43200) * 1000;
-    cachedAccessToken = {
-      token: data.access_token,
-      expiresAt: now + expiresInMs,
-    };
-
-    return data.access_token;
-  } catch (err) {
-    console.error("[Allegro] Token refresh exception:", err);
-    return null;
-  }
+  const res = await getAllegroAccessTokenWithDebug();
+  return res.token;
 }
 
 export async function getAllegroAccessTokenWithDebug(): Promise<{ token: string | null; error?: string; debug?: any }> {
   const clientId = process.env.ALLEGRO_CLIENT_ID;
   const clientSecret = process.env.ALLEGRO_CLIENT_SECRET;
-  const refreshToken = process.env.ALLEGRO_REFRESH_TOKEN;
   const redirectUri = process.env.ALLEGRO_REDIRECT_URI || "https://vsebezlepku-orders.vercel.app/api/allegro/callback";
   const userAgent = process.env.ALLEGRO_USER_AGENT || "VseBezLepku-Stock-Sync/1.0 (+https://vsebezlepku-orders.vercel.app)";
+
+  // 1. Check in-memory cache first
+  const now = Date.now();
+  if (cachedAccessToken && cachedAccessToken.expiresAt > now + 5 * 60 * 1000) {
+    return { token: cachedAccessToken.token, debug: { source: "memory_cache" } };
+  }
+
+  // 2. Check PostgreSQL database for stored tokens
+  const dbTokens = await getAllegroTokensFromDb();
+  if (dbTokens && dbTokens.accessToken && dbTokens.expiresAt.getTime() > now + 5 * 60 * 1000) {
+    cachedAccessToken = {
+      token: dbTokens.accessToken,
+      expiresAt: dbTokens.expiresAt.getTime(),
+    };
+    return { token: dbTokens.accessToken, debug: { source: "db_cache", expiresAt: dbTokens.expiresAt } };
+  }
+
+  // 3. Need to refresh token using DB refresh_token or env fallback
+  const refreshTokenToUse = dbTokens?.refreshToken || process.env.ALLEGRO_REFRESH_TOKEN;
 
   const debug = {
     hasClientId: !!clientId,
     hasClientSecret: !!clientSecret,
-    hasRefreshToken: !!refreshToken,
-    refreshTokenLength: refreshToken ? refreshToken.length : 0,
+    hasDbToken: !!dbTokens,
+    hasRefreshToken: !!refreshTokenToUse,
+    refreshTokenLength: refreshTokenToUse ? refreshTokenToUse.length : 0,
     redirectUri,
   };
 
-  if (!clientId || !clientSecret || !refreshToken) {
-    return { token: null, error: `Chybí proměnné prostředí: ClientID=${!!clientId}, ClientSecret=${!!clientSecret}, RefreshToken=${!!refreshToken}`, debug };
+  if (!clientId || !clientSecret || !refreshTokenToUse) {
+    return {
+      token: null,
+      error: `Chybí autorizace Allegra. Otevřete prosím odkaz https://vsebezlepku-orders.vercel.app/api/allegro/auth pro jednorázovou autorizaci do databáze.`,
+      debug,
+    };
   }
 
   try {
@@ -90,7 +62,7 @@ export async function getAllegroAccessTokenWithDebug(): Promise<{ token: string 
 
     const bodyParams = new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: refreshToken.trim(),
+      refresh_token: refreshTokenToUse.trim(),
       redirect_uri: redirectUri,
     });
 
@@ -110,11 +82,26 @@ export async function getAllegroAccessTokenWithDebug(): Promise<{ token: string 
     }
 
     const data = await response.json();
-    return { token: data.access_token, debug };
+    const expiresInMs = (data.expires_in || 43200) * 1000;
+
+    // Save newly rotated tokens directly to PostgreSQL database!
+    try {
+      await saveAllegroTokensToDb(data.access_token, data.refresh_token, data.expires_in || 43200);
+    } catch (dbSaveErr) {
+      console.error("[Allegro] Error saving refreshed token to DB:", dbSaveErr);
+    }
+
+    cachedAccessToken = {
+      token: data.access_token,
+      expiresAt: now + expiresInMs,
+    };
+
+    return { token: data.access_token, debug: { source: "refreshed_and_saved_to_db" } };
   } catch (err) {
     return { token: null, error: `Výjimka při volání Allegro API: ${String(err)}`, debug };
   }
 }
+
 
 
 /**
