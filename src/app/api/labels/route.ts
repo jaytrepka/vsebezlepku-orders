@@ -60,30 +60,36 @@ export async function POST(request: NextRequest) {
 
     // Only link labels to OrderItems for the default language (cs)
     if (language === "cs") {
-      // Link this label to all existing OrderItems with the same productName
+      const normalizedName = normalizeProductName(data.productName);
+
+      // 1. Exact match
       await prisma.orderItem.updateMany({
         where: { productName: data.productName },
         data: { labelId: label.id },
       });
 
-      // Also link to items with " - Pomozte neplýtvat" suffix
-      const normalizedName = normalizeProductName(data.productName);
-      if (normalizedName === data.productName) {
-        // Original name has no suffix, so look for items WITH the suffix
-        const itemsWithSuffix = await prisma.orderItem.findMany({
+      // 2. ProductCode match if short code
+      if (data.productName.length <= 10) {
+        await prisma.orderItem.updateMany({
+          where: { productCode: data.productName },
+          data: { labelId: label.id },
+        });
+      }
+
+      // 3. Contains / prefix match for unlinked items
+      if (normalizedName.length > 10) {
+        const itemsToLink = await prisma.orderItem.findMany({
           where: {
             labelId: null,
             productName: { contains: normalizedName },
           },
         });
         
-        for (const item of itemsWithSuffix) {
-          if (normalizeProductName(item.productName) === normalizedName) {
-            await prisma.orderItem.update({
-              where: { id: item.id },
-              data: { labelId: label.id },
-            });
-          }
+        for (const item of itemsToLink) {
+          await prisma.orderItem.update({
+            where: { id: item.id },
+            data: { labelId: label.id },
+          });
         }
       }
     }

@@ -44,12 +44,29 @@ export async function POST() {
     }
     
     for (const item of unlinkedItems) {
-      // Try exact match first
+      // 1. Try exact match first
       let labelId = labelMap.get(item.productName);
       
-      // If no exact match, try normalized name
+      // 2. Try normalized name
       if (!labelId) {
         labelId = labelMap.get(normalizeProductName(item.productName));
+      }
+
+      // 3. Try by productCode
+      if (!labelId && item.productCode) {
+        labelId = labelMap.get(item.productCode);
+      }
+
+      // 4. Try prefix/contains match
+      if (!labelId) {
+        const itemNorm = normalizeProductName(item.productName).toLowerCase();
+        for (const label of labels) {
+          const lblNorm = normalizeProductName(label.productName).toLowerCase();
+          if (lblNorm.length > 10 && (itemNorm.startsWith(lblNorm) || itemNorm.includes(lblNorm))) {
+            labelId = label.id;
+            break;
+          }
+        }
       }
       
       if (labelId) {
